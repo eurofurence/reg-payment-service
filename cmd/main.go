@@ -36,7 +36,7 @@ func main() {
 
 	logging.Ctx(ctx).Debug("Setting up router")
 	handler := server.CreateRouter(
-		interaction.NewServiceInteractor())
+		interaction.NewServiceInteractor(), conf.Service)
 
 	logging.Ctx(ctx).Debug("setting up server")
 	srv := server.NewServer(ctx, &conf.Server, handler)

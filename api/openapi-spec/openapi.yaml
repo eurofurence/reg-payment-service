@@ -131,10 +131,10 @@ components:
         status:
           type: string
           enum:
-            - valid
-            - deleted
             - pending
             - tentative
+            - valid
+            - deleted
         effective_date:
           type: string
           format: date

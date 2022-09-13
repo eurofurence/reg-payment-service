@@ -28,7 +28,8 @@ type (
 	// ServiceConfig contains configuration values
 	// for service related tasks. E.g. URL to payment provider adapter
 	ServiceConfig struct {
-		ServiceName string `yaml:"name"`
+		ServiceName  string `yaml:"name"`
+		ServiceToken string `yaml:"token"`
 	}
 
 	// DatabaseConfig contains all required configuration
