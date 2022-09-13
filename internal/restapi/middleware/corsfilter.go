@@ -3,11 +3,11 @@ package middleware
 import (
 	"github.com/go-http-utils/headers"
 
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/config"
-	
-	"net/http"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
+
 	"log"
+	"net/http"
 )
 
 func createCorsHeadersHandler(next http.Handler, config *config.Application) func(w http.ResponseWriter, r *http.Request) {
@@ -15,7 +15,7 @@ func createCorsHeadersHandler(next http.Handler, config *config.Application) fun
 		ctx := r.Context()
 
 		// Example for cors middleware
-		if config != nil && config.IsCorsDisabled {
+		if config != nil && !config.IsCorsDisabled {
 			logging.Ctx(ctx).Warn("sending headers to disable CORS. This configuration is not intended for production use, only for local development!")
 			w.Header().Set(headers.AccessControlAllowOrigin, "*")
 			w.Header().Set(headers.AccessControlAllowMethods, "POST, GET, OPTIONS, PUT, DELETE")

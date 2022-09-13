@@ -6,14 +6,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/eurofurence/reg-payment-service/internal/restapi/media"
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-http-utils/headers"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging"
+	"github.com/eurofurence/reg-payment-service/internal/restapi/media"
 )
 
 func Create(server chi.Router) {
-	server.Get("/", healthGet)
+	server.Get("/info/health", healthGet)
 }
 
 func healthGet(w http.ResponseWriter, r *http.Request) {

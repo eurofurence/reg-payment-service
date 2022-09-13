@@ -2,9 +2,10 @@ package middleware
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"net/http"
 	"regexp"
+
+	"github.com/google/uuid"
 )
 
 var RequestIDHeader = "X-Request-Id"

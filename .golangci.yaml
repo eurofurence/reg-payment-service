@@ -48,6 +48,8 @@ output:
 
 # all available settings of specific linters
 linters-settings:
+  golint:
+   min-confidence: 0.8
   gofmt:
     # simplify code: gofmt with `-s` option, true by default
     simplify: true
@@ -56,6 +58,11 @@ linters-settings:
     # it's a comma-separated list of prefixes
     local-prefixes: github.com/eurofurence/reg-payment-service
   revive:
+    rules:
+      - name: package-comments
+        disabled: true
+      - name: exported
+        disabled: false
     # minimal confidence for issues, default is 0.8
     min-confidence: 0.8
   govet:
@@ -112,18 +119,21 @@ linters:
     - revive
     - govet
     - gosec
-  disable:
-    - bodyclose
+    - unused
+    - exportloopref
     - contextcheck
     - nilerr
     - noctx
+    - bodyclose
+    - staticcheck
+    - unparam
+  disable:
+    - deadcode
+    - varcheck 
+    - scopelint
+    - structcheck
     - rowserrcheck
     - sqlclosecheck
-    - staticcheck
-    - structcheck
-    - unparam
-    - unused
-    - scopelint
   disable-all: false
   presets:
     - bugs

@@ -5,11 +5,15 @@
 package server
 
 import (
+	"fmt"
+
+	"github.com/eurofurence/reg-payment-service/internal/config"
+	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 	v1health "github.com/eurofurence/reg-payment-service/internal/restapi/v1/health"
+	v1transactions "github.com/eurofurence/reg-payment-service/internal/restapi/v1/transactions"
 
 	"context"
-	"log"
 	"net"
 	"net/http"
 	"time"
@@ -17,44 +21,36 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// quick and dirty method of handling the server. 
-// do not export as global variable in productive code
-var srv *http.Server
+func NewServer(ctx context.Context, conf *config.ServerConfig, router http.Handler) *http.Server {
 
-func Create() chi.Router {
-	server := chi.NewRouter()
-
-	server.Use(middleware.RequestIdMiddleware())
-	server.Use(middleware.LogRequestIdMiddleware())
-	server.Use(middleware.CorsHeadersMiddleware())
-
-	v1health.Create(server)
-	// add your controllers here
-	return server
-}
-
-func Serve(ctx context.Context, server chi.Router) {
-	const address = ":8080"
-	srv = &http.Server{
-		Addr:         address,
-		Handler:      server,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
+	return &http.Server{
+		Addr:         fmt.Sprintf("%s:%d", conf.BaseAddress, conf.Port),
+		Handler:      router,
+		ReadTimeout:  time.Second * time.Duration(conf.ReadTimeout),
+		WriteTimeout: time.Second * time.Duration(conf.WriteTimeout),
+		IdleTimeout:  time.Second * time.Duration(conf.IdleTimeout),
 		BaseContext: func(l net.Listener) context.Context {
 			return ctx
 		},
 	}
-
-	if err := srv.ListenAndServe(); err != nil {
-		log.Fatal("Failed...")
-	}
 }
 
-func Shutdown(ctx context.Context) error {
-	if srv != nil {
-		return srv.Shutdown(ctx)
-	}
+func CreateRouter(i interaction.Interactor) chi.Router {
+	router := chi.NewRouter()
 
-	return nil
+	router.Use(middleware.RequestIdMiddleware())
+	router.Use(middleware.LogRequestIdMiddleware())
+	router.Use(middleware.CorsHeadersMiddleware())
+
+	setupV1Routes(router, i)
+
+	return router
+}
+
+func setupV1Routes(router chi.Router, i interaction.Interactor) {
+	v1health.Create(router)
+
+	router.Route("/api/rest/v1", func(r chi.Router) {
+		v1transactions.Create(r, i)
+	})
 }

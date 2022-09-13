@@ -5,8 +5,7 @@
 
 ## Overview
 
-A backend service...
-
+A backend service
 Implemented in go.
 
 Command line arguments

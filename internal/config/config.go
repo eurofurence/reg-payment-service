@@ -1,40 +1,52 @@
-// In general, configs are loaded via yaml files, that will be placed on the server.
-// Therefore implement handling to load yaml from a file and validate the config based on rules
-// which apply for the corresponding service implementation.
-
 package config
 
 import (
-	"os"
-	// "gopkg.in/yaml.v2"
+	"io"
+
+	"gopkg.in/yaml.v3"
 )
 
 type (
+	// Application is the root configuration type
+	// that holds all other subconfiguration types
 	Application struct {
-		Service ServiceConfig `yaml:"serviceConfig"`
-		IsCorsDisabled bool `yaml:"corsDisabled"`
+		Service        ServiceConfig `yaml:"serviceConfig"`
+		Server         ServerConfig  `yaml:"serverConfig"`
+		IsCorsDisabled bool          `yaml:"corsDisabled"`
 	}
 
+	// ServerConfig contains all values for
+	// http releated configuration
+	ServerConfig struct {
+		BaseAddress  string `yaml:"baseAddress"`
+		Port         int    `yaml:"port"`
+		ReadTimeout  int    `yaml:"readTimeoutSeconds"`
+		WriteTimeout int    `yaml:"writeTimeoutSeconds"`
+		IdleTimeout  int    `yaml:"idleTimeoutSeconds"`
+	}
+
+	// ServiceConfig contains configuration values
+	// for service related tasks. E.g. URL to payment provider adapter
 	ServiceConfig struct {
-		ServiceName string `yaml:"serviceName"`
-		Port        int    `env:"servicePort"`
+		ServiceName string `yaml:"name"`
+	}
+
+	// DatabaseConfig contains all required configuration
+	// values for database related tasks
+	DatabaseConfig struct {
+		// TODO
 	}
 )
 
-func UnmarshalFromYamlConfiguration(file *os.File) (*Application, error) {
+// UnmarshalFromYamlConfiguration decodes yaml data from an `io.Reader` interface.
+func UnmarshalFromYamlConfiguration(file io.Reader) (*Application, error) {
+	d := yaml.NewDecoder(file)
 
-	// Load configuration from a yaml file
+	var conf Application
 
-	// example:
-	// defer file.Close()
-	// d := yaml.NewDecoder(file)
-	//
-	// config := &Config{}
-	// if err := d.Decode(&config); err != nil {
-	// 		return nil, err
-	// }
+	if err := d.Decode(&conf); err != nil {
+		return nil, err
+	}
 
-	// return config, nil
-
-	return nil, nil
+	return &conf, nil
 }

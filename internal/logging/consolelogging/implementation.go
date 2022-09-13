@@ -1,9 +1,10 @@
 package consolelogging
 
 import (
-	"github.com/eurofurence/reg-payment-service/internal/logging/consolelogging/logformat"
 	"log"
 	"os"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging/consolelogging/logformat"
 )
 
 const severityDEBUG = "DEBUG"
