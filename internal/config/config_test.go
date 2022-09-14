@@ -54,11 +54,4 @@ idleTimeoutSeconds: 120
 	require.Error(t, err)
 
 	require.Nil(t, conf)
-	require.Equal(t, "TestServiceName", conf.Service.ServiceName)
-	require.Equal(t, "", conf.Server.BaseAddress)
-	require.Equal(t, 8080, conf.Server.Port)
-	require.Equal(t, 30, conf.Server.ReadTimeout)
-	require.Equal(t, 30, conf.Server.WriteTimeout)
-	require.Equal(t, 120, conf.Server.IdleTimeout)
-	require.True(t, conf.IsCorsDisabled)
 }

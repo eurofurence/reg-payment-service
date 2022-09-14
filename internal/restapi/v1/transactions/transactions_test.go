@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,8 @@ func setupServer() (string, func()) {
 	router.Use(middleware.LogRequestIdMiddleware())
 	router.Use(middleware.CorsHeadersMiddleware())
 	router.Route("/api/rest/v1", func(r chi.Router) {
-		Create(r, nil)
+		// TODO create mock of Interactor interface
+		Create(r, interaction.NewServiceInteractor())
 	})
 
 	srv := httptest.NewServer(router)
