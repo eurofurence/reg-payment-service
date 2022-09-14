@@ -19,3 +19,5 @@ To install required dependencies run `go mod download`
 
 If you place this repository OUTSIDE of your gopath, `go build cmd/main.go` and `go test ./...` will download all
 required dependencies by default.
+
+In order to generate mocks, the service is using https://github.com/matryer/moq. Install the binary via `go install github.com/matryer/moq@latest`

@@ -10,9 +10,10 @@ type (
 	// Application is the root configuration type
 	// that holds all other subconfiguration types
 	Application struct {
-		Service        ServiceConfig `yaml:"serviceConfig"`
-		Server         ServerConfig  `yaml:"serverConfig"`
-		IsCorsDisabled bool          `yaml:"corsDisabled"`
+		Service        ServiceConfig  `yaml:"serviceConfig"`
+		Server         ServerConfig   `yaml:"serverConfig"`
+		Database       DatabaseConfig `yaml:"database"`
+		IsCorsDisabled bool           `yaml:"corsDisabled"`
 	}
 
 	// ServerConfig contains all values for
@@ -35,7 +36,11 @@ type (
 	// DatabaseConfig contains all required configuration
 	// values for database related tasks
 	DatabaseConfig struct {
-		// TODO
+		Use        string   `yaml:"use"`
+		Username   string   `yaml:"username"`
+		Password   string   `yaml:"password"`
+		Database   string   `yaml:"database"`
+		Parameters []string `yaml:"parameters"`
 	}
 )
 

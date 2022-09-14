@@ -4,10 +4,13 @@ import (
 	"errors"
 	"flag"
 	"net/http"
+	"path/filepath"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database"
+	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 	"github.com/eurofurence/reg-payment-service/internal/server"
 
 	"context"
@@ -34,6 +37,15 @@ func main() {
 		os.Exit(0)
 	}
 
+	repo, err := database.NewMySQLProvider(conf.Database)
+	if err != nil {
+		logging.Ctx(ctx).Error(err)
+	}
+
+	if err := createFooTestBla(ctx, repo); err != nil {
+		logging.Ctx(ctx).Error(err)
+	}
+
 	logging.Ctx(ctx).Debug("Setting up router")
 	handler := server.CreateRouter(
 		interaction.NewServiceInteractor(), conf.Service)
@@ -43,10 +55,10 @@ func main() {
 
 	go func() {
 		<-sig
-		cancel()
+		defer cancel()
 		logging.Ctx(ctx).Info("Stopping services now")
 
-		tCtx, tcancel := context.WithTimeout(context.Background(), time.Second*5)
+		tCtx, tcancel := context.WithTimeout(ctx, time.Second*5)
 		defer tcancel()
 
 		if err := srv.Shutdown(tCtx); err != nil {
@@ -90,10 +102,19 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 		return nil, errors.New("directory provided but yaml file was expected")
 	}
 
-	f, err := os.Open(configPath)
+	f, err := os.Open(filepath.Clean(configPath))
 	if err != nil {
 		return nil, err
 	}
 
 	return config.UnmarshalFromYamlConfiguration(f)
+}
+
+// TODO remove only for tests
+func createFooTestBla(ctx context.Context, d database.Repository) error {
+	f := entities.Foo{
+		Age:  18,
+		Name: "Hello World",
+	}
+	return d.CreateFoo(ctx, f)
 }

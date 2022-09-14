@@ -7,7 +7,7 @@ import (
 
 type (
 	Response[T any] struct {
-		Payload    *T  `json:"payload"`
+		Payload    T   `json:"payload"`
 		StatusCode int `json:"-"`
 	}
 
@@ -31,7 +31,7 @@ func (r *ErrorResponse) EncodeToJSON(w http.ResponseWriter) error {
 
 func NewResponse[T any](payload T, statusCode int) *Response[T] {
 	return &Response[T]{
-		Payload:    &payload,
+		Payload:    payload,
 		StatusCode: statusCode,
 	}
 }

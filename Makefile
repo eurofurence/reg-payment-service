@@ -10,6 +10,8 @@ GOBUILD_ARGS ?= -ldflags "-s -w" -trimpath
 
 GOLANGCI_LINT ?= $(call tool,golangci-lint)
 
+DOCKER_COMPOSE ?= $(call tool, docker-compose)
+
 .PHONY: test
 test:
 	@$(GO) clean -testcache
@@ -22,4 +24,11 @@ lint:
 .PHONY: build
 build: lint
 	@$(GOBUILD) $(GOBUILD_ARGS) -o build/service cmd/main.go
-	
+
+.PHONY: up
+up:
+	@$(DOCKER_COMPOSE) up -d --build
+
+.PHONY: down
+down:
+	@$(DOCKER_COMPOSE) down

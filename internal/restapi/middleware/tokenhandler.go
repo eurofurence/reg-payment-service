@@ -6,6 +6,7 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
+// nolint
 const tokenHeaderKey = "X-API-TOKEN"
 
 func tokenHandlerMiddleware(token string, next http.Handler) http.Handler {
@@ -14,7 +15,9 @@ func tokenHandlerMiddleware(token string, next http.Handler) http.Handler {
 		if token != headerToken {
 			logging.NoCtx().Error("invalid token provided")
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error_message": "request was unauthorized", "status": 401}`))
+			if _, err := w.Write([]byte(`{"error_message": "request was unauthorized", "status": 401}`)); err != nil {
+				logging.Ctx(r.Context()).Error(err)
+			}
 
 			return
 		}

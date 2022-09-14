@@ -47,8 +47,6 @@ func CreateRouter(i interaction.Interactor, conf config.ServiceConfig) chi.Route
 	return router
 }
 
-type abc int
-
 func setupV1Routes(router chi.Router, i interaction.Interactor, conf config.ServiceConfig) {
 	v1health.Create(router)
 

@@ -1,16 +1,17 @@
 package v1transactions
 
 import (
+	"context"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/eurofurence/reg-payment-service/internal/interaction"
-	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/eurofurence/reg-payment-service/internal/interaction"
+	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
 
 func setupServer() (string, func()) {
@@ -39,12 +40,12 @@ func TestHandleTransactionsGet(t *testing.T) {
 
 	cl := http.DefaultClient
 
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/%s", apiBasePath, "transactions/10"), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("%s/%s", apiBasePath, "transactions/10"), nil)
 	require.NoError(t, err)
 
 	resp, err := cl.Do(req)
-	require.NoError(t, err)
 
-	require.NoError(t, io.NopCloser(resp.Body).Close())
+	require.NoError(t, resp.Body.Close())
+	require.NoError(t, err)
 
 }

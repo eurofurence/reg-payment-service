@@ -3,10 +3,11 @@ package v1transactions
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/types"
-	"github.com/go-chi/chi/v5"
 )
 
 type transactionHandler struct {
@@ -23,7 +24,7 @@ func Create(router chi.Router, i interaction.Interactor) {
 }
 
 func (t *transactionHandler) handleTransactionsGet(w http.ResponseWriter, r *http.Request) {
-	dID := chi.URLParam(r, "debitor_id")
+	dID := chi.URLParamFromCtx(r.Context(), "debitor_id")
 
 	ctx := r.Context()
 
@@ -37,8 +38,9 @@ func (t *transactionHandler) handleTransactionsGet(w http.ResponseWriter, r *htt
 		return
 	}
 
-	types.NewResponse(&result, http.StatusOK).
-		EncodeToJSON(w)
+	if err := types.NewResponse(result, http.StatusOK).EncodeToJSON(w); err != nil {
+		logging.Ctx(ctx).Error(err)
+	}
 
 }
 

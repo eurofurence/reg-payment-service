@@ -1,4 +1,20 @@
-server:
-  port: 8081
-security:
-  disable_cors: false
+serviceConfig:
+  name: "Registration Payment Service" 
+  token: "cf8dd87c-3da0-4f56-9ab3-56ee636e6ca6"
+serverConfig:
+  port: 8080
+  readTimeoutSeconds: 30
+  writeTimeoutSeconds: 30
+  idleTimeoutSeconds: 120 
+database:
+  use: mysql #or inmemory
+  username: 'demouser'
+  password: 'demopw'
+  database: 'tcp(localhost:3306)/dbname'
+  parameters:
+    - 'charset=utf8mb4'
+    - 'collation=utf8mb4_general_ci'
+    - 'parseTime=True'
+    - 'timeout=30s' # connection timeout
+corsDisabled: false
+
