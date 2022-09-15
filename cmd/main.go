@@ -9,8 +9,7 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
-	"github.com/eurofurence/reg-payment-service/internal/repository/database"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/mysql"
 	"github.com/eurofurence/reg-payment-service/internal/server"
 
 	"context"
@@ -37,13 +36,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	repo, err := database.NewMySQLProvider(conf.Database)
+	repo, err := mysql.NewMySQLConnector(conf.Database)
 	if err != nil {
-		logging.Ctx(ctx).Error(err)
+		logging.Ctx(ctx).Fatal(err)
 	}
 
-	if err := createFooTestBla(ctx, repo); err != nil {
-		logging.Ctx(ctx).Error(err)
+	if err := repo.Migrate(); err != nil {
+		logging.Ctx(ctx).Fatal(err)
 	}
 
 	logging.Ctx(ctx).Debug("Setting up router")
@@ -73,11 +72,12 @@ func main() {
 }
 
 func parseArgsAndReadConfig() (*config.Application, error) {
-	var showHelp bool
+	var showHelp, migrate bool
 	var configPath string
 
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configPath, "config", "", "The path to a configuration file")
+	flag.BoolVar(&migrate, "migrate", false, "Performs database migrations before the service starts")
 	// flag.StringVar(&configPath, "c", "", "The path to a configuration file")
 
 	flag.Parse()
@@ -108,13 +108,4 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 	}
 
 	return config.UnmarshalFromYamlConfiguration(f)
-}
-
-// TODO remove only for tests
-func createFooTestBla(ctx context.Context, d database.Repository) error {
-	f := entities.Foo{
-		Age:  18,
-		Name: "Hello World",
-	}
-	return d.CreateFoo(ctx, f)
 }
