@@ -22,6 +22,8 @@ tags:
   - name: transactions
     description: The transaction API
 paths:
+# TODO GET endpoint for admin tasks - How to authenticate admin?
+# List all transactions with specific parameters
   /v1/transactions/{debitor_id}:
     get:
       tags:
@@ -81,6 +83,35 @@ paths:
           description: An unexpected error occurred
       security:
         - api_key: [] 
+    put:
+      tags:
+        - "transactions"
+      summary: Updates transactions
+      description: |-
+        Updates transactions based on predefined rules. 
+      operationId: updateTransactions
+      requestBody:
+        required: true
+        description: A list of transactions that should be updated
+        content: 
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Transactions'
+      responses:
+        '200':
+          description: successful operation
+        '401':
+          description: Request was unauthorized
+        '405':
+          description: Request validation failed
+        '500':
+          description: An unexpected error occurred
+                
+              
+
+      security:
+        - api_key: []
+      
 components:
   schemas:
     TransactionResponse:
@@ -129,12 +160,7 @@ components:
         comment:
           type: string
         status:
-          type: string
-          enum:
-            - pending
-            - tentative
-            - valid
-            - deleted
+          $ref: '#/components/schemas/TransactionStatus'
         effective_date:
           type: string
           format: date
@@ -167,12 +193,7 @@ components:
       type: object
       properties:
         previous_status:
-          type: string
-          enum:
-            - valid
-            - deleted
-            - pending
-            - tentative
+          $ref: '#/components/schemas/TransactionStatus'
         deletion_comment:
           type: string
         deleted_by:
@@ -180,6 +201,13 @@ components:
         deletion_date:
           type: string
           format: date-time
+    TransactionStatus:
+      type: string
+      enum:
+        - pending
+        - tentative
+        - valid
+        - deleted
   securitySchemes:
     api_key:
       type: apiKey
