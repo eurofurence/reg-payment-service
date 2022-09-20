@@ -45,12 +45,34 @@ func NewMySQLConnector(conf config.DatabaseConfig) (database.Repository, error) 
 func (i *mysqlConnector) Migrate() error {
 	i.db.AutoMigrate(
 		&entities.TransactionType{},
-		&entities.TransactionStatus{},
 		&entities.PaymentMethod{},
+		&entities.TransactionStatus{},
 		&entities.Transaction{},
-		&entities.History{},
+		&entities.TransactionLog{},
 	)
+
+	i.populateStates()
+
 	return nil
+}
+
+func (i *mysqlConnector) populateStates() {
+	// Transaction Types
+	i.db.FirstOrCreate(&entities.TransactionType{ID: 0, Description: "Due"})
+	i.db.FirstOrCreate(&entities.TransactionType{ID: 1, Description: "Payment"})
+
+	// Payment Methods
+	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 0, Description: "Credit"})
+	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 1, Description: "Paypal"})
+	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 2, Description: "Transfer"})
+	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 3, Description: "Internal"})
+	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 4, Description: "Gift"})
+
+	// Transaction States
+	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 0, Description: "Pending"})
+	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 1, Description: "Tentative"})
+	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 2, Description: "Valid"})
+	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 3, Description: "Deleted"})
 }
 
 func buildMySQLDSN(username, password, database string, parameters []string) (string, error) {
@@ -67,7 +89,15 @@ func buildMySQLDSN(username, password, database string, parameters []string) (st
 		}
 	}
 
-	return fmt.Sprintf("%s:%s@%s?%s", username, password, database, strings.Join(parameters, "&")), nil
+	paramStr := func() string {
+		if len(parameters) == 0 {
+			return ""
+		}
+
+		return fmt.Sprintf("?%s", strings.Join(parameters, "&"))
+	}
+
+	return fmt.Sprintf("%s:%s@%s%s", username, password, database, paramStr()), nil
 }
 
 func checkValue(name, value string) error {

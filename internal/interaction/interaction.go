@@ -2,9 +2,11 @@ package interaction
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 )
 
 var _ Interactor = (*serviceInteractor)(nil)
@@ -15,11 +17,17 @@ type Interactor interface {
 }
 
 type serviceInteractor struct {
+	store database.Repository
 }
 
-func NewServiceInteractor() Interactor {
-	// TODO add database and cross service handler
-	return &serviceInteractor{}
+func NewServiceInteractor(r database.Repository) (Interactor, error) {
+	if r == nil {
+		return nil, errors.New("repository must not be nil")
+	}
+
+	return &serviceInteractor{
+		store: r,
+	}, nil
 }
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID string) ([]domain.Transaction, error) {

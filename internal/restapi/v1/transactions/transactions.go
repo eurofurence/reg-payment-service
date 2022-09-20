@@ -41,7 +41,6 @@ func (t *transactionHandler) handleTransactionsGet(w http.ResponseWriter, r *htt
 	if err := types.NewResponse(result, http.StatusOK).EncodeToJSON(w); err != nil {
 		logging.Ctx(ctx).Error(err)
 	}
-
 }
 
 func (t *transactionHandler) handleTransactionsPost(w http.ResponseWriter, r *http.Request) {
