@@ -14,7 +14,8 @@ type Repository interface {
 
 type TransactionRepository interface {
 	CreateTransaction(ctx context.Context, tr entities.Transaction) error
-	GetTransactionByID(ctx context.Context, id int) (*entities.Transaction, error)
+	GetTransactionByTransactionIDAndType(ctx context.Context, transactionID string, tType uint) (*entities.Transaction, error)
+	GetTransactionsByDebitorID(ctx context.Context, debitorID string) ([]entities.Transaction, error)
 	UpdateTransaction(ctx context.Context, tr entities.Transaction) error
 }
 

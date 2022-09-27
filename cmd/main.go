@@ -144,7 +144,8 @@ func playDatabase(ctx context.Context, r database.Repository) {
 		dt := defaultTransaction()
 
 		dt.Comment = "Hello1"
-		dt.TransactionStatusID = uint(domain.Tentative)
+		dt.TransactionStatusID = uint(domain.Valid)
+		dt.DebitorID = "new-deb1"
 		err = testUpdateTransaction(ctx, r, dt)
 		if err != nil {
 			logging.Ctx(ctx).Fatal(err)

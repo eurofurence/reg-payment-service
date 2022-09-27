@@ -43,13 +43,17 @@ func NewMySQLConnector(conf config.DatabaseConfig) (database.Repository, error) 
 }
 
 func (i *mysqlConnector) Migrate() error {
-	i.db.AutoMigrate(
+	err := i.db.AutoMigrate(
 		&entities.TransactionType{},
 		&entities.PaymentMethod{},
 		&entities.TransactionStatus{},
 		&entities.Transaction{},
 		&entities.TransactionLog{},
 	)
+
+	if err != nil {
+		return err
+	}
 
 	i.populateStates()
 

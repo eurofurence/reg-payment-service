@@ -31,9 +31,13 @@ func (t *transactionHandler) handleTransactionsGet(w http.ResponseWriter, r *htt
 	result, err := t.interactor.GetTransactionsForDebitor(ctx, dID)
 	if err != nil {
 		logging.Ctx(ctx).Error(err)
-		types.
+		respErr := types.
 			NewErrorResponse(err, http.StatusInternalServerError).
 			EncodeToJSON(w)
+
+		if respErr != nil {
+			logging.Ctx(ctx).Error(err)
+		}
 
 		return
 	}

@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 )
 
 func NewServer(ctx context.Context, conf *config.ServerConfig, router http.Handler) *http.Server {
@@ -38,6 +39,7 @@ func NewServer(ctx context.Context, conf *config.ServerConfig, router http.Handl
 func CreateRouter(i interaction.Interactor, conf config.ServiceConfig) chi.Router {
 	router := chi.NewRouter()
 
+	router.Use(chimiddleware.Recoverer)
 	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.LogRequestIdMiddleware())
 	router.Use(middleware.CorsHeadersMiddleware())

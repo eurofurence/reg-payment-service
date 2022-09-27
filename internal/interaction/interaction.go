@@ -3,17 +3,17 @@ package interaction
 import (
 	"context"
 	"errors"
-	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/domain"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
+	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 )
 
 var _ Interactor = (*serviceInteractor)(nil)
 
 type Interactor interface {
 	GetTransactionsForDebitor(ctx context.Context, debitorID string) ([]domain.Transaction, error)
-	CreateTransactionForDebitor(ctx context.Context, debitorID string, tran *domain.Transaction) error
+	CreateTransaction(ctx context.Context, tran *domain.Transaction) error
 }
 
 type serviceInteractor struct {
@@ -31,26 +31,60 @@ func NewServiceInteractor(r database.Repository) (Interactor, error) {
 }
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID string) ([]domain.Transaction, error) {
-	return []domain.Transaction{
-		{
-			ID:        "1",
-			DebitorID: debitorID,
-			Type:      domain.Payment,
-			Method:    domain.Credit,
-			Amount: domain.Amount{
-				Currency:  "EUR",
-				GrossCent: 190_00,
-				VatRate:   19.0,
-			},
-			Comment:       "Fun Fun Fun",
-			Status:        domain.Tentative,
-			EffectiveDate: time.Now(),
-			DueDate:       time.Now().AddDate(0, 0, 1),
-			Deletion:      nil,
-		},
-	}, nil
+	eTran, err := s.store.GetTransactionsByDebitorID(ctx, debitorID)
+	if err != nil {
+		return nil, err
+	}
+
+	return toDomainTransactions(eTran), nil
+
 }
 
-func (s *serviceInteractor) CreateTransactionForDebitor(ctx context.Context, debitorID string, tran *domain.Transaction) error {
-	panic("Not implemented")
+func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *domain.Transaction) error {
+	return nil
+}
+
+func toDomainTransactions(tran []entities.Transaction) []domain.Transaction {
+	res := make([]domain.Transaction, len(tran))
+	for i, v := range tran {
+		res[i] = toDomainTransaction(v)
+	}
+
+	return res
+}
+
+func toDomainTransaction(tr entities.Transaction) domain.Transaction {
+	dtr := domain.Transaction{
+		ID:        tr.TransactionID,
+		DebitorID: tr.DebitorID,
+		Type:      domain.TransactionType(tr.TransactionTypeID),
+		Method:    domain.PaymentMethod(tr.PaymentMethodID),
+		Amount: domain.Amount{
+			Currency:  tr.Amount.ISOCurrency,
+			GrossCent: tr.Amount.GrossCent,
+			VatRate:   tr.Amount.VatRate,
+		},
+		Comment: tr.Comment,
+		Status:  domain.TransactionStatus(tr.TransactionStatusID),
+	}
+
+	if tr.EffectiveDate.Valid {
+		dtr.EffectiveDate = tr.EffectiveDate.Time
+	}
+
+	if tr.DueDate.Valid {
+		dtr.DueDate = tr.DueDate.Time
+	}
+
+	if tr.DeletedAt.Valid {
+		dtr.Deletion = &domain.Deletion{
+			PreviousStatus: domain.TransactionStatus(tr.Deletion.TransactionStatusID),
+			Comment:        tr.Deletion.Comment,
+			DeletedBy:      tr.Deletion.By,
+			Date:           tr.DeletedAt.Time,
+		}
+	}
+
+	return dtr
+
 }
