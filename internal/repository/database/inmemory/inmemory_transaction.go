@@ -19,5 +19,5 @@ func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Cont
 }
 
 func (m *inmemoryProvider) GetTransactionsByDebitorID(ctx context.Context, debitorID string) ([]entities.Transaction, error) {
-	panic("not implemented") // TODO: Implement
+	return nil, nil
 }
