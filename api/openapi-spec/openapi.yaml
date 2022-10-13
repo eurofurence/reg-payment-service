@@ -1,0 +1,219 @@
+openapi: 3.0.3
+info:
+  title: Reg Payment Service - OpenAPI 3.0
+  description: |-
+    The Reg Payment Service is a processesor to handle transaction related tasks in regards to 
+    registration tasks. 
+    
+    Those tasks are:
+    * Creating transactions for payments and dues
+        * Evaluation transaction models
+        * Interaction with payment provider adapters
+    * Retrieving debitor transactions
+    * Historization of transaction logs
+    
+  license:
+    name: MIT
+    url: https://github.com/eurofurence/reg-payment-service/LICENSE
+  version: 1.0.0
+servers:
+  - url: TODO
+tags:
+  - name: transactions
+    description: The transaction API
+paths:
+# TODO GET endpoint for admin tasks - How to authenticate admin?
+# List all transactions with specific parameters
+  /v1/transactions/{debitor_id}:
+    get:
+      tags:
+        - transactions
+      summary: Request information about existing Transactions
+      description: Get existing transactions for an authorized user
+      operationId: getTransactionsByUser
+      parameters:
+        - name: debitor_id
+          in: path
+          description: The of a debitor.
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Invalid ID supplied
+        '401':
+          description: Request was unauthorized
+        '404':
+          description: No Transactions available for this attendee
+        '500':
+          description: An unexpected error occurred
+      security:
+        - api_key: []
+  /v1/transactions:
+    post:
+      tags:
+        - transactions
+      summary: Requests a new payment for a selected payment provider
+      description: |- 
+        Request provides information about a new payment that will be initiated based on the requested
+        payment method. 
+      operationId: createTransaction 
+      requestBody:
+        description: A transaction object to perform an operation according to the data provided
+        required: true
+        content:
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Transaction'
+      responses:
+        '200':
+          description: successful operation
+        '401':
+          description: Request was unauthorized
+        '405':
+          description: Request validation failed
+        '500':
+          description: An unexpected error occurred
+      security:
+        - api_key: [] 
+    put:
+      tags:
+        - "transactions"
+      summary: Updates transactions
+      description: |-
+        Updates transactions based on predefined rules. 
+      operationId: updateTransactions
+      requestBody:
+        required: true
+        description: A list of transactions that should be updated
+        content: 
+          application/json:
+            schema: 
+              $ref: '#/components/schemas/Transactions'
+      responses:
+        '200':
+          description: successful operation
+        '401':
+          description: Request was unauthorized
+        '405':
+          description: Request validation failed
+        '500':
+          description: An unexpected error occurred
+                
+              
+
+      security:
+        - api_key: []
+      
+components:
+  schemas:
+    TransactionResponse:
+      type: object
+      properties:
+        payload:
+          type: object
+          $ref: '#/components/schemas/Transactions'
+        # pagination:
+        #   type: object
+        #   $ref: '#/components/schemas/Pagination'
+    Transactions:
+      type: array
+      items: 
+        $ref: '#/components/schemas/Transaction'
+    Transaction:
+      required:
+        - "debitor_id"
+        - "transaction_identifier"
+        - "transaction_type" 
+        - "method"
+        - "amount"
+        - "comment"
+      type: object
+      properties:
+        debitor_id:
+          type: string
+        transaction_identifier: 
+          type: string
+        transaction_type:
+          type: string
+          enum:
+            - due
+            - payment
+        method:
+          type: string
+          enum: 
+            - credit
+            - paypal
+            - transfer
+            - internal 
+            - gift
+        amount:
+          type: object
+          $ref: '#/components/schemas/Amount'
+        comment:
+          type: string
+        status:
+          $ref: '#/components/schemas/TransactionStatus'
+        effective_date:
+          type: string
+          format: date
+        due_date:
+          type: string
+          format: date-time
+        creation_date:
+          type: string
+          format: date-time
+        deletion:
+          type: object
+          $ref: '#/components/schemas/Deletion'
+    Amount: 
+      type: object
+      properties:
+        currency: #check if needed
+          type: string
+          default: EUR
+        gross_cent:
+          type: integer
+          format: int64 #check required size
+        vat_rate:
+          type: number
+          format: double
+      required:
+        - "currency"
+        - "gross_cent"
+        - "vat_rate"
+    Deletion:
+      type: object
+      properties:
+        previous_status:
+          $ref: '#/components/schemas/TransactionStatus'
+        deletion_comment:
+          type: string
+        deleted_by:
+          type: string
+        deletion_date:
+          type: string
+          format: date-time
+    TransactionStatus:
+      type: string
+      enum:
+        - pending
+        - tentative
+        - valid
+        - deleted
+  securitySchemes:
+    api_key:
+      type: apiKey
+      name: X-API-TOKEN
+      in: header
+    # bearer_auth:            
+    #   type: http
+    #   scheme: bearer
+    #   bearerFormat: JWT   

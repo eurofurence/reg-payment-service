@@ -1,0 +1,8 @@
+.idea/**
+.vscode/**
+*.exe
+build/**
+main
+reg-payment-service
+**/*.swp
+config.yaml
