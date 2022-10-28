@@ -188,11 +188,19 @@ paths:
         * tentative -> deleted (payment link has been deleted)
         * pending -> deleted (payment has been deemed in error)
 
+
         Payment processor information changes:
         (does not need to be historized, as the adapter will write logs)
 
         At any time, api token may change the payment_processor_information. This is so the
         adapters have some way to store internal state.
+
+      
+        Due Date changes:
+        (does not need to be historized)
+        
+        At any time, an admin may change the due date (used for dues only).
+
       
         It is an error to attempt any changes not listed above.        
         Any other changes should be made by setting this transaction to deleted and creating a new one.
@@ -271,7 +279,7 @@ components:
           type: integer
           format: int64
           minimum: 1
-          description: the debitor the transaction concerns. Set when reading transactions so the information is available, but ignored on received transactions (part of the path).
+          description: the debitor the transaction concerns
         transaction_identifier:
           type: string
           description: |-
