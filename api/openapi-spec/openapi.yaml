@@ -7,38 +7,68 @@ info:
     
     Those tasks are:
     * Creating transactions for payments and dues
-        * Evaluation transaction models
         * Interaction with payment provider adapters
     * Retrieving debitor transactions
-    * Historization of transaction logs
+    * Historization of transaction status
     
   license:
     name: MIT
     url: https://github.com/eurofurence/reg-payment-service/LICENSE
   version: 1.0.0
 servers:
-  - url: TODO
+  - url: /
+    description: localhost
+  - url: /paysrv
+    description: server
 tags:
   - name: transactions
     description: The transaction API
 paths:
-# TODO GET endpoint for admin tasks - How to authenticate admin?
-# List all transactions with specific parameters
-  /v1/transactions/{debitor_id}:
+  /v1/transactions:
     get:
       tags:
         - transactions
       summary: Request information about existing Transactions
-      description: Get existing transactions for an authorized user
-      operationId: getTransactionsByUser
+      description: |-
+        Get existing transactions, provided they are visible to you.
+        
+        Visibility rules: 
+        * an admin may see all transactions for any debitor of any status 
+        * a debitor may only see their own transactions, and excluding status deleted
+          
+        (note: to find out which debitor_ids are "their own", have a look at the GET /attendees endpoint of
+         the attendee service, which answers this question. You will need to pass on the user token so it knows who's asking)
+      operationId: getTransactions
       parameters:
         - name: debitor_id
-          in: path
-          description: The of a debitor.
-          required: true
+          in: query
+          description: The id of a debitor to filter by
+          required: false
           schema:
             type: integer
             format: int64
+            minimum: 1
+        - name: transaction_identifier
+          in: query
+          description: filter by transaction_identifier
+          required: false
+          schema:
+            type: string
+            example: EF2022-000004-1028-200954-4711
+        - name: effective_from
+          in: query
+          description: filter by effective date (inclusive) lower bound
+          required: false
+          schema:
+            type: string
+            example: 2022-10-01
+        - name: effective_before
+          in: query
+          description: filter by effective date (exclusive) upper bound - this makes it easy to get everything in a given month
+          required: false
+          schema:
+            type: string
+            example: 2022-11-01
       responses:
         '200':
           description: Successful operation
@@ -48,23 +78,47 @@ paths:
                 $ref: '#/components/schemas/TransactionResponse'
         '400':
           description: Invalid ID supplied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '401':
-          description: Request was unauthorized
+          description: Request was unauthorized (wrong or no api token, invalid, expired or no bearer token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '404':
-          description: No Transactions available for this attendee
+          description: No Transactions available for this debitor given the visibility rules, or
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
-          description: An unexpected error occurred
+          description: An unexpected error occurred. A reasonable effort is made to return error information, but there are situations where this will not work
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
         - api_key: []
-  /v1/transactions:
+        - bearer_auth: []
     post:
       tags:
         - transactions
-      summary: Requests a new payment for a selected payment provider
+      summary: Add a new transaction, possibly creating a payment link in the process.
       description: |- 
-        Request provides information about a new payment that will be initiated based on the requested
-        payment method. 
-      operationId: createTransaction 
+        This endpoint adds a new transaction.
+        
+        If transaction_type=payment, method=credit, status=tentative,
+        then a payment link is created and the transaction is saved including the payment link and its id.
+
+        In all other cases, the transaction is saved as is, and no payment link is created.
+
+        Only admin or api token allows saving transactions.
+        
+        This endpoint returns the created transaction so you get access to the payment link, if any.
+      operationId: createTransaction
       requestBody:
         description: A transaction object to perform an operation according to the data provided
         required: true
@@ -73,52 +127,128 @@ paths:
             schema: 
               $ref: '#/components/schemas/Transaction'
       responses:
-        '200':
-          description: successful operation
-        '401':
-          description: Request was unauthorized
-        '405':
+        '201':
+          description: Successfully created
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created resource, ending in the assigned transaction ID.
+              example: /v1/transactions/481
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
           description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request was unauthorized (wrong or no api token, invalid, expired or no bearer token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request was forbidden (you do not have permission to create transactions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
-          description: An unexpected error occurred
+          description: An unexpected error occurred. A reasonable effort is made to return error information, but there are situations where this will not work
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
         - api_key: [] 
+        - bearer_auth: []
+  /v1/transactions/{id}:
     put:
       tags:
         - "transactions"
-      summary: Updates transactions
+      summary: Update a transaction
       description: |-
-        Updates transactions based on predefined rules. 
+        Updates a transaction.
+        
+        Only api token or admin may update transactions.
+
+        Status changes:
+        (The previous status is always historized, see the history field)
+        
+        Within 3 calendar days of creation, for any transaction an admin may change
+        - status -> deleted
+        
+        Afterwards, the only possible change is status for payments
+        * tentative -> pending (payment link has been used)
+        * pending -> valid (payment is confirmed by admin or by payment provider)
+        * tentative -> deleted (payment link has been deleted)
+        * pending -> deleted (payment has been deemed in error)
+
+        Payment processor information changes:
+        (does not need to be historized, as the adapter will write logs)
+
+        At any time, api token may change the payment_processor_information. This is so the
+        adapters have some way to store internal state.
+      
+        It is an error to attempt any changes not listed above.        
+        Any other changes should be made by setting this transaction to deleted and creating a new one.
       operationId: updateTransactions
+      parameters:
+        - name: id
+          in: path
+          description: The id of the transaction to update
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
       requestBody:
         required: true
-        description: A list of transactions that should be updated
+        description: The new transaction data. It is an error to change anything other than the status.
         content: 
           application/json:
             schema: 
-              $ref: '#/components/schemas/Transactions'
+              $ref: '#/components/schemas/Transaction'
       responses:
-        '200':
+        '204':
           description: successful operation
-        '401':
-          description: Request was unauthorized
-        '405':
+        '400':
           description: Request validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request was unauthorized (wrong or no api token, invalid, expired or no bearer token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request was forbidden (you do not have permission to change transactions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
-          description: An unexpected error occurred
-                
-              
-
+          description: An unexpected error occurred. A reasonable effort is made to return error information, but there are situations where this will not work
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
       security:
         - api_key: []
-      
+        - bearer_auth: []
 components:
   schemas:
     TransactionResponse:
       type: object
       properties:
         payload:
-          type: object
           $ref: '#/components/schemas/Transactions'
         # pagination:
         #   type: object
@@ -128,92 +258,210 @@ components:
       items: 
         $ref: '#/components/schemas/Transaction'
     Transaction:
-      required:
-        - "debitor_id"
-        - "transaction_identifier"
-        - "transaction_type" 
-        - "method"
-        - "amount"
-        - "comment"
       type: object
+      required:
+        - debitor_id
+        - transaction_type
+        - method
+        - amount
+        - status
+        - effective_date
       properties:
         debitor_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: the debitor the transaction concerns. Set when reading transactions so the information is available, but ignored on received transactions (part of the path).
+        transaction_identifier:
           type: string
-        transaction_identifier: 
-          type: string
+          description: |-
+            a reference id that can be used to search for a particular transaction.
+
+            If you do not set this, we will fill it for you as follows for each newly created transaction
+
+            {prefix-from-config}-NNNNNN-MMDD-HHMMSS-RRRR
+
+            where {prefix-from-config} might be something like "EF2022", NNNNNN is the debitor id in 6 digits,
+            MMDD is the month and day of transaction creation, HHMMSS is the time including seconds,
+            and RRRR is a random 4 digit numeric code to ensure uniqueness even within the same second.
+
+            Passed on to the credit card processor, so make sure this is unique across even multiple years.
+            Internally, we only ensure uniqueness within the same year (unique database index for fast lookup).
+            
+            Must consist solely of A-Z, 0-9 and -, no spaces.
+            
+            Will always be set when an existing transaction is read, and it is not allowed to change this
+            for existing transactions (the credit card processor uses this identifier).
+            
+            TODO test that format is within length limitations of concardis, might need to shorten
+          example: EF2022-000004-1028-200954-4711
         transaction_type:
           type: string
           enum:
             - due
             - payment
+          example: payment
         method:
           type: string
-          enum: 
+          enum:
             - credit
             - paypal
             - transfer
-            - internal 
+            - internal
             - gift
+          example: credit
         amount:
-          type: object
           $ref: '#/components/schemas/Amount'
         comment:
           type: string
         status:
           $ref: '#/components/schemas/TransactionStatus'
+        payment_processor_information:
+          $ref: '#/components/schemas/PaymentProcessorInformation'
+        payment_start_url:
+          type: string
+          format: url
+          description: if available, the URL to use for payment. For concardis, contains the pay link.
         effective_date:
           type: string
           format: date
+          description: the valuta day (a concept from accounting).
+          example: '2022-06-24'
         due_date:
           type: string
           format: date-time
+          description: the time at which the dues should be paid at the latest, or you'll be considered overdue.
+          example: '2022-08-24T14:22:28Z'
         creation_date:
           type: string
           format: date-time
-        deletion:
-          type: object
-          $ref: '#/components/schemas/Deletion'
-    Amount: 
+          example: '2022-06-24T11:12:13Z'
+        status_history:
+          $ref: '#/components/schemas/StatusHistory'
+    Amount:
       type: object
-      properties:
-        currency: #check if needed
-          type: string
-          default: EUR
-        gross_cent:
-          type: integer
-          format: int64 #check required size
-        vat_rate:
-          type: number
-          format: double
       required:
         - "currency"
         - "gross_cent"
         - "vat_rate"
-    Deletion:
-      type: object
       properties:
-        previous_status:
-          $ref: '#/components/schemas/TransactionStatus'
-        deletion_comment:
+        currency:
           type: string
-        deleted_by:
-          type: string
-        deletion_date:
-          type: string
-          format: date-time
+          default: EUR
+          description: |-
+            currency ISO code. 
+            
+            Since mixing currencies can lead to complex situations, we only support a single currency, which is defined in the configuration.
+            
+            Any other value will be rejected as an error.
+        gross_cent:
+          type: integer
+          format: int64
+          description: currency amount, may be negative, in smallest denomination of the currency (for example cent for EUR). The example value means 140 EUR.
+          example: 14000
+        vat_rate:
+          type: number
+          format: double
+          description: VAT rate in percent. The example value means 7.7% VAT.
+          example: 7.7
+    StatusHistory:
+      description: the history of status changes for this transaction. Only visible to admins.
+      type: array
+      items:
+        type: object
+        required:
+          - status
+          - change_date
+        properties:
+          status:
+            $ref: '#/components/schemas/TransactionStatus'
+          comment:
+            type: string
+            description: optional comment why the change was made
+          changed_by:
+            type: string
+            description: the subject from the JWT (that is, the user id from the identity provider)
+          change_date:
+            type: string
+            format: date-time
     TransactionStatus:
       type: string
+      example: valid
       enum:
-        - pending
         - tentative
+        - pending
         - valid
         - deleted
+      description: |-
+        Status of a transaction.
+        
+        * tentative (payments only): either we know that NO payment for this transaction has been initiated,
+                                     or we cannot say for sure. Mostly used to store payment links before they
+                                     have been used (though we may only learn about the fact after it's happened).
+        * pending (payments only): we know that a payment for this transaction has been initiated, but the
+                                   transaction hasn't been (manually or automatically) confirmed as successful
+        * valid (dues and payments): dues or payments should count towards the balance, if payment, the
+                                     transaction has been (manually or automatically) confirmed as successful
+        * deleted (dues and payments): should not count towards the balance, only kept for historical reasons,
+                                       for example, payment attempt has failed, or an admin made a mistake
+    PaymentProcessorInformation:
+      type: object
+      description: internal information pertaining to the selected payment processor, such as a payment id, a payment URL, etc. Exact structure depends on the payment provider.
+      additionalProperties: true
+      example:
+        id: 72168763
+        booking_code: something
+    Error:
+      type: object
+      required:
+        - message
+        - timestamp
+        - requestid
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: The time at which the error occurred.
+          example: 2006-01-02T15:04:05+07:00
+        requestid:
+          type: string
+          description: An internal trace id assigned to the error. Used to find logs associated with errors across our services. Display to the user as something to communicate to us with inquiries about the error.
+          example: a8b7c6d5
+        message:
+          type: string
+          description: |-
+            A keyed description of the error. We do not write human readable text here because the user interface will be multi language.
+            
+            At this time, there are these values:
+            - transaction.parse.error (json body parse error)
+            - transaction.data.invalid (field data failed to validate, see details field for more information)
+            - transaction.data.duplicate (duplicate referenceId)            
+            - transaction.write.error (database error)
+            - transaction.paylink.error (adapter failure while creating payment link)            
+            - transaction.id.notfound (no such transaction in the database)
+            - transaction.id.invalid (syntactically invalid transaction id, must be positive integer)
+            - transaction.cannot.delete (deletion is not possible, e.g. because the grace period has expired for a valid payment)
+            - auth.unauthorized (token missing completely or invalid or expired)
+            - auth.forbidden (permissions missing)
+          example: transaction.data.invalid
+        details:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+          description: Optional additional details about the error. If available, will usually contain English language technobabble.
+          example:
+            reference_id:
+              - reference id must consist of A-Z 0-9 - only
+            other:
+              - you need to refill the flux capacitor before the operation can succeed
   securitySchemes:
     api_key:
       type: apiKey
       name: X-API-TOKEN
       in: header
-    # bearer_auth:            
-    #   type: http
-    #   scheme: bearer
-    #   bearerFormat: JWT   
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
