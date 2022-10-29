@@ -6,3 +6,4 @@ main
 reg-payment-service
 **/*.swp
 config.yaml
+Notes.md

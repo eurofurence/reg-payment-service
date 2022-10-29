@@ -1,17 +1,16 @@
 package middleware
 
 import (
-	"github.com/eurofurence/reg-payment-service/internal/logging"
-
 	"net/http"
 )
 
 func logRequestIdHandler(next http.Handler) func(w http.ResponseWriter, r *http.Request) {
 	handlerFunc := func(w http.ResponseWriter, r *http.Request) {
 		// example to log a request id
-		ctx := r.Context()
-		newCtx := logging.CreateContextWithLoggerForRequestId(ctx, GetRequestID(ctx))
-		r = r.WithContext(newCtx)
+		// ctx := r.Context()
+		// logger := logging.NewLoggerFromContext(ctx)
+		// newCtx := logging.CreateContextWithLoggerForRequestId(ctx, GetRequestID(ctx))
+		// r = r.WithContext(newCtx)
 
 		next.ServeHTTP(w, r)
 	}

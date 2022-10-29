@@ -16,7 +16,7 @@ func createCorsHeadersHandler(next http.Handler, config *config.Application) fun
 
 		// Example for cors middleware
 		if config != nil && !config.IsCorsDisabled {
-			logging.Ctx(ctx).Warn("sending headers to disable CORS. This configuration is not intended for production use, only for local development!")
+			logging.LoggerFromContext(ctx).Warn("sending headers to disable CORS. This configuration is not intended for production use, only for local development!")
 			w.Header().Set(headers.AccessControlAllowOrigin, "*")
 			w.Header().Set(headers.AccessControlAllowMethods, "POST, GET, OPTIONS, PUT, DELETE")
 			w.Header().Set(headers.AccessControlAllowHeaders, "content-type")
