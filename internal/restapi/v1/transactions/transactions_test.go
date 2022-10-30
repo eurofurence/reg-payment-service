@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
@@ -22,7 +23,7 @@ func setupServer(t *testing.T) (string, func()) {
 	router.Use(middleware.CorsHeadersMiddleware())
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface
-		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider())
+		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(), logging.NewNoopLogger())
 		require.NoError(t, err)
 		Create(r, s)
 	})

@@ -37,6 +37,10 @@ func SendStatusNotFoundResponse(w http.ResponseWriter, reqID string, logger logg
 	SendResponseWithStatusAndMessage(w, http.StatusNotFound, reqID, message, logger)
 }
 
+func SendInternalServerError(w http.ResponseWriter, reqID string, message string, logger logging.Logger) {
+	SendResponseWithStatusAndMessage(w, http.StatusInternalServerError, reqID, message, logger)
+}
+
 func SendResponseWithStatusAndMessage(w http.ResponseWriter, status int, reqID, message string, logger logging.Logger) {
 	if reqID == "" {
 		logger.Debug("request id is empty")

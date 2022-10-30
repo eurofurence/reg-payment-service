@@ -7,24 +7,29 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
-type RequestProvider[Req any] func(r *http.Request) (*Req, error)
+type RequestHandler[Req any] func(r *http.Request) (*Req, error)
 type ResponseHandler[Res any] func(res *Res, w http.ResponseWriter) error
 type Endpoint[Req, Res any] func(ctx context.Context, request *Req) (*Res, error)
 
-func CreateHandler[Request, Response any](ep Endpoint[Request, Response],
-	rp RequestProvider[Request],
-	rh ResponseHandler[Response]) http.HandlerFunc {
+func CreateHandler[Req, Res any](ep Endpoint[Req, Res],
+	requestHandler RequestHandler[Req],
+	responseHandler ResponseHandler[Res]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqID := GetRequestID(ctx)
 		logger := logging.LoggerFromContext(ctx)
 
-		if rp == nil {
-			logger.Error("No request provider supplied")
+		if requestHandler == nil {
+			logger.Fatal("No request provider supplied")
 			return
 		}
 
-		request, err := rp(r)
+		if responseHandler == nil {
+			logger.Fatal("No response handler supplied")
+			return
+		}
+
+		request, err := requestHandler(r)
 		if err != nil {
 			logger.Error("An error occurred while parsing the request. [error]: %v", err)
 
@@ -38,9 +43,8 @@ func CreateHandler[Request, Response any](ep Endpoint[Request, Response],
 			return
 		}
 
-		if err := rh(response, w); err != nil {
+		if err := responseHandler(response, w); err != nil {
 			logger.Error("An error occurred during the handling of the response. [error]: %v", err)
 		}
-
 	})
 }

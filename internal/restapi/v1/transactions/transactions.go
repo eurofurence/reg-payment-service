@@ -2,6 +2,8 @@ package v1transactions
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -9,36 +11,46 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
-type transactionHandler struct {
-	interactor interaction.Interactor
-}
-
 func Create(router chi.Router, i interaction.Interactor) {
-	handler := transactionHandler{
-		interactor: i,
-	}
-
 	router.Get("/transactions/{debitor_id}",
 		common.CreateHandler(
-			CreateGetTransactionsEndpoint(i),
+			MakeGetTransactionsEndpoint(i),
 			getTransactionsRequestHandler,
 			getTransactionsResponseHandler),
 	)
 
-	router.Post("/transactions", handler.handleTransactionsPost)
+	router.Post("/transactions",
+		common.CreateHandler(
+			MakeCreateTransactionEndpoint(i),
+			createTransactionRequestHandler,
+			createTransactionResponseHandler),
+	)
+
+	//router.Put("/transactions/{id}", common.CreateHandler(nil, nil, nil))
 }
 
-func (t *transactionHandler) handleTransactionsPost(w http.ResponseWriter, r *http.Request) {
-	// TODO implement
-}
-
-func CreateGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
+func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
 	return func(ctx context.Context, request *GetTransactionsRequest) (*GetTransactionsResponse, error) {
+		logger := logging.LoggerFromContext(ctx)
 		// TODO
-		// i.GetTransactionsForDebitor()
+
+		_, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
+
+		if err != nil {
+			logger.Error("Could not get transactions. [error]: %v", err)
+			return nil, err
+		}
+
+		return nil, nil
+	}
+}
+
+func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
+	return func(ctx context.Context, request *CreateTransactionRequest) (*CreateTransactionResponse, error) {
 
 		return nil, nil
 	}
@@ -78,9 +90,25 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 
 func getTransactionsResponseHandler(response *GetTransactionsResponse, w http.ResponseWriter) error {
 	if response == nil {
-		// Send 404
-		w.WriteHeader(http.StatusNotFound)
+		return fmt.Errorf("invalid response to parse")
 	}
+
+	return nil
+}
+
+func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
+	var request CreateTransactionRequest
+
+	err := json.NewDecoder(r.Body).Decode(&request)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func createTransactionResponseHandler(response *CreateTransactionResponse, w http.ResponseWriter) error {
 
 	return nil
 }

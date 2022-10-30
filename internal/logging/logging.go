@@ -96,3 +96,26 @@ func NewLogger() Logger {
 		logger: &logger,
 	}
 }
+
+func NewNoopLogger() Logger {
+	return &noopLogger{}
+}
+
+type noopLogger struct {
+}
+
+func (l *noopLogger) Debug(format string, v ...interface{}) {
+}
+
+func (l *noopLogger) Info(format string, v ...interface{}) {
+}
+
+func (l *noopLogger) Warn(format string, v ...interface{}) {
+}
+
+func (l *noopLogger) Error(format string, v ...interface{}) {
+}
+
+// expected to terminate the process
+func (l *noopLogger) Fatal(format string, v ...interface{}) {
+}

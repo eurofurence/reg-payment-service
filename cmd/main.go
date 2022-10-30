@@ -54,7 +54,7 @@ func main() {
 	playDatabase(ctx, repo)
 
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo)
+		return interaction.NewServiceInteractor(repo, logger)
 	})
 
 	logger.Debug("Setting up router")
@@ -149,7 +149,7 @@ func playDatabase(ctx context.Context, r database.Repository) {
 
 		dt.Comment = "Hello1"
 		dt.TransactionStatusID = uint(domain.Valid)
-		dt.DebitorID = "new-deb1"
+		dt.DebitorID = 1
 		err = testUpdateTransaction(ctx, r, dt)
 		if err != nil {
 			logger.Fatal("An error occurred. [error]: %v", err)
@@ -170,7 +170,7 @@ func testUpdateTransaction(ctx context.Context, r database.Repository, tr entiti
 func defaultTransaction() entities.Transaction {
 	return entities.Transaction{
 		TransactionID:     "123456789",
-		DebitorID:         "1",
+		DebitorID:         1,
 		TransactionTypeID: uint(domain.Due),
 		TransactionType: entities.TransactionType{
 			Description: "Due",
