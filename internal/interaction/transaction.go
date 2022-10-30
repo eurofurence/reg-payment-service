@@ -8,7 +8,7 @@ import (
 )
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID int64) ([]domain.Transaction, error) {
-	eTran, err := s.store.GetTransactionsByDebitorID(ctx, debitorID)
+	eTran, err := s.store.GetTransactionsByFilter(ctx, debitorID)
 	if err != nil {
 		return nil, err
 	}

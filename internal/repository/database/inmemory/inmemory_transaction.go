@@ -18,6 +18,6 @@ func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Cont
 	panic("not implemented") // TODO: Implement
 }
 
-func (m *inmemoryProvider) GetTransactionsByDebitorID(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
 	return nil, nil
 }

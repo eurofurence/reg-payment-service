@@ -84,7 +84,7 @@ func (m *mysqlConnector) GetTransactionByTransactionIDAndType(ctx context.Contex
 	return &tr, nil
 }
 
-func (m *mysqlConnector) GetTransactionsByDebitorID(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+func (m *mysqlConnector) GetTransactionsByFilter(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
 	var transactions []entities.Transaction
 
 	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
