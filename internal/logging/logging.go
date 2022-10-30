@@ -31,7 +31,7 @@ func (l *loggingWrapper) Info(format string, v ...interface{}) {
 }
 
 func (l *loggingWrapper) Warn(format string, v ...interface{}) {
-	l.logger.Warn().Msgf(format, v)
+	l.logger.Warn().Msgf(format, v...)
 }
 
 func (l *loggingWrapper) Error(format string, v ...interface{}) {

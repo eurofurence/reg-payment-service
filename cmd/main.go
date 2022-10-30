@@ -44,7 +44,7 @@ func main() {
 	}
 
 	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
-		return mysql.NewMySQLConnector(conf.Database)
+		return mysql.NewMySQLConnector(conf.Database, logger)
 	})
 
 	if err := repo.Migrate(); err != nil {

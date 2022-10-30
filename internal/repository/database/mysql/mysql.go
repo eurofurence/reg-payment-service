@@ -3,21 +3,25 @@ package mysql
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 )
 
 type mysqlConnector struct {
-	db *gorm.DB
+	lock   sync.RWMutex
+	logger logging.Logger
+	db     *gorm.DB
 }
 
-func NewMySQLConnector(conf config.DatabaseConfig) (database.Repository, error) {
+func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (database.Repository, error) {
 	dsn, err := buildMySQLDSN(conf.Username, conf.Password, conf.Database, conf.Parameters)
 	if err != nil {
 		return nil, err
@@ -38,8 +42,11 @@ func NewMySQLConnector(conf config.DatabaseConfig) (database.Repository, error) 
 	sqlDB.SetConnMaxLifetime(time.Minute * 10)
 
 	return &mysqlConnector{
-		db: db,
+		lock:   sync.RWMutex{},
+		logger: logger,
+		db:     db,
 	}, nil
+
 }
 
 func (i *mysqlConnector) Migrate() error {

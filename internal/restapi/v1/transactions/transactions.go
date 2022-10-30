@@ -3,7 +3,6 @@ package v1transactions
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -100,7 +99,7 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 
 func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.ResponseWriter) error {
 	if res == nil {
-		return fmt.Errorf("invalid response to parse")
+		return common.ErrorFromMessage(common.TransactionDataInvalidMessage)
 	}
 
 	return nil
