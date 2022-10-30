@@ -97,6 +97,17 @@ func NewLogger() Logger {
 	}
 }
 
+// Returns a new logger, that holds a request ID.
+func WithRequestID(ctx context.Context, reqID string) Logger {
+	logger := LoggerFromContext(ctx)
+	if wrapper, ok := logger.(*loggingWrapper); ok {
+		logger := wrapper.logger.With().Str("request_id", reqID).Logger()
+		return &loggingWrapper{&logger}
+	}
+
+	return logger
+}
+
 func NewNoopLogger() Logger {
 	return &noopLogger{}
 }
@@ -116,6 +127,5 @@ func (l *noopLogger) Warn(format string, v ...interface{}) {
 func (l *noopLogger) Error(format string, v ...interface{}) {
 }
 
-// expected to terminate the process
 func (l *noopLogger) Fatal(format string, v ...interface{}) {
 }

@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestCreateHandler(t *testing.T) {
 		{
 			name:       "Should do nothing when no request handler was provided",
 			reqHandler: nil,
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			respHandler: func(res *testResponse, w http.ResponseWriter) error {
@@ -61,7 +62,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should do nothing when no response handler was provided",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {
@@ -74,7 +75,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should increase counter when all values are set",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {
@@ -91,7 +92,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should return bad request when request validation failed",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {
@@ -108,7 +109,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should return internal server error when endpoint returns an error",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return nil, errors.New("Endpoint failed")
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {
@@ -125,7 +126,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should return internal server error when Response Handler returns an error",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {
@@ -142,7 +143,7 @@ func TestCreateHandler(t *testing.T) {
 		},
 		{
 			name: "Should successfully return result when nothing failed",
-			endpoint: func(ctx context.Context, request *testRequest) (*testResponse, error) {
+			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
 			reqHandler: func(r *http.Request) (*testRequest, error) {

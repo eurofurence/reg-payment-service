@@ -38,8 +38,7 @@ func Create(router chi.Router, i interaction.Interactor) {
 }
 
 func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
-	return func(ctx context.Context, request *GetTransactionsRequest) (*GetTransactionsResponse, error) {
-		logger := logging.LoggerFromContext(ctx)
+	return func(ctx context.Context, request *GetTransactionsRequest, logger logging.Logger) (*GetTransactionsResponse, error) {
 		_, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
 
 		if err != nil {
@@ -52,14 +51,14 @@ func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTr
 }
 
 func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
-	return func(ctx context.Context, request *CreateTransactionRequest) (*CreateTransactionResponse, error) {
+	return func(ctx context.Context, request *CreateTransactionRequest, logger logging.Logger) (*CreateTransactionResponse, error) {
 
 		return nil, nil
 	}
 }
 
 func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[UpdateTransactionRequest, UpdateTransactionResponse] {
-	return func(ctx context.Context, request *UpdateTransactionRequest) (*UpdateTransactionResponse, error) {
+	return func(ctx context.Context, request *UpdateTransactionRequest, logger logging.Logger) (*UpdateTransactionResponse, error) {
 
 		return nil, nil
 	}

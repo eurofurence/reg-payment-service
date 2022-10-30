@@ -9,15 +9,15 @@ import (
 
 type RequestHandler[Req any] func(r *http.Request) (*Req, error)
 type ResponseHandler[Res any] func(res *Res, w http.ResponseWriter) error
-type Endpoint[Req, Res any] func(ctx context.Context, request *Req) (*Res, error)
+type Endpoint[Req, Res any] func(ctx context.Context, request *Req, logger logging.Logger) (*Res, error)
 
-func CreateHandler[Req, Res any](ep Endpoint[Req, Res],
+func CreateHandler[Req, Res any](e Endpoint[Req, Res],
 	requestHandler RequestHandler[Req],
 	responseHandler ResponseHandler[Res]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		reqID := GetRequestID(ctx)
-		logger := logging.LoggerFromContext(ctx)
+		logger := logging.WithRequestID(ctx, reqID)
 
 		defer func() {
 			err := r.Body.Close()
@@ -45,7 +45,7 @@ func CreateHandler[Req, Res any](ep Endpoint[Req, Res],
 			return
 		}
 
-		response, err := ep(ctx, request)
+		response, err := e(ctx, request, logger)
 
 		if err != nil {
 			logger.Error("An error occurred during the request. [error]: %v", err)
