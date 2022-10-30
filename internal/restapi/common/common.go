@@ -25,23 +25,22 @@ func EncodeToJSON(w http.ResponseWriter, obj interface{}, logger logging.Logger)
 }
 
 func SendUnauthorizedResponse(w http.ResponseWriter, reqID string, logger logging.Logger) {
-	SendResponseWithStatusAndMessage(w, http.StatusUnauthorized, reqID, "Request was unauthorized (wrong or no api token, invalid, expired or no bearer token)", logger)
+	SendResponseWithStatusAndMessage(w, http.StatusUnauthorized, reqID, AuthUnauthorizedMessage, logger)
 }
 
 func SendBadRequestResponse(w http.ResponseWriter, reqID string, logger logging.Logger) {
-	SendResponseWithStatusAndMessage(w, http.StatusBadRequest, reqID, "Request validation failed", logger)
+	SendResponseWithStatusAndMessage(w, http.StatusBadRequest, reqID, RequestParseErrorMessage, logger)
 }
 
 func SendStatusNotFoundResponse(w http.ResponseWriter, reqID string, logger logging.Logger) {
-	message := "No Transactions available for this debitor given the visibility rules, or an error occured"
-	SendResponseWithStatusAndMessage(w, http.StatusNotFound, reqID, message, logger)
+	SendResponseWithStatusAndMessage(w, http.StatusNotFound, reqID, TransactionIDNotFoundMessage, logger)
 }
 
-func SendInternalServerError(w http.ResponseWriter, reqID string, message string, logger logging.Logger) {
+func SendInternalServerError(w http.ResponseWriter, reqID string, message APIErrorMessage, logger logging.Logger) {
 	SendResponseWithStatusAndMessage(w, http.StatusInternalServerError, reqID, message, logger)
 }
 
-func SendResponseWithStatusAndMessage(w http.ResponseWriter, status int, reqID, message string, logger logging.Logger) {
+func SendResponseWithStatusAndMessage(w http.ResponseWriter, status int, reqID string, message APIErrorMessage, logger logging.Logger) {
 	if reqID == "" {
 		logger.Debug("request id is empty")
 	}

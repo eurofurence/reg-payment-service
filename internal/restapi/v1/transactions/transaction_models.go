@@ -81,3 +81,7 @@ type CreateTransactionRequest struct {
 
 type CreateTransactionResponse struct {
 }
+
+type UpdateTransactionRequest struct{}
+
+type UpdateTransactionResponse struct{}

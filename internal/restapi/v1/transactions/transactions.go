@@ -30,14 +30,17 @@ func Create(router chi.Router, i interaction.Interactor) {
 			createTransactionResponseHandler),
 	)
 
-	//router.Put("/transactions/{id}", common.CreateHandler(nil, nil, nil))
+	router.Put("/transactions/{id}",
+		common.CreateHandler(
+			MakeUpdateTransactionEndpoint(i),
+			updateTransactionRequestHandler,
+			updateTransactionResponseHandler),
+	)
 }
 
 func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
 	return func(ctx context.Context, request *GetTransactionsRequest) (*GetTransactionsResponse, error) {
 		logger := logging.LoggerFromContext(ctx)
-		// TODO
-
 		_, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
 
 		if err != nil {
@@ -51,6 +54,13 @@ func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTr
 
 func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
 	return func(ctx context.Context, request *CreateTransactionRequest) (*CreateTransactionResponse, error) {
+
+		return nil, nil
+	}
+}
+
+func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[UpdateTransactionRequest, UpdateTransactionResponse] {
+	return func(ctx context.Context, request *UpdateTransactionRequest) (*UpdateTransactionResponse, error) {
 
 		return nil, nil
 	}
@@ -88,8 +98,8 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 	return &req, nil
 }
 
-func getTransactionsResponseHandler(response *GetTransactionsResponse, w http.ResponseWriter) error {
-	if response == nil {
+func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.ResponseWriter) error {
+	if res == nil {
 		return fmt.Errorf("invalid response to parse")
 	}
 
@@ -108,8 +118,16 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 	return &request, nil
 }
 
-func createTransactionResponseHandler(response *CreateTransactionResponse, w http.ResponseWriter) error {
+func createTransactionResponseHandler(res *CreateTransactionResponse, w http.ResponseWriter) error {
 
+	return nil
+}
+
+func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
+	return nil, nil
+}
+
+func updateTransactionResponseHandler(res *UpdateTransactionResponse, w http.ResponseWriter) error {
 	return nil
 }
 
