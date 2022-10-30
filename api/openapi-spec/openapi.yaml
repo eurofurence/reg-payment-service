@@ -451,6 +451,8 @@ components:
             - transaction.cannot.delete (deletion is not possible, e.g. because the grace period has expired for a valid payment)
             - auth.unauthorized (token missing completely or invalid or expired)
             - auth.forbidden (permissions missing)
+            - request.parse.failed (request could not be parsed properly)
+            - http.error.unkonwn (unknown error)
           example: transaction.data.invalid
         details:
           type: object
