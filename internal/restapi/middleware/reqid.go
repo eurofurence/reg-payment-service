@@ -5,8 +5,9 @@ import (
 	"net/http"
 	"regexp"
 
-	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/google/uuid"
+
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
 var RequestIDHeader = "X-Request-Id"

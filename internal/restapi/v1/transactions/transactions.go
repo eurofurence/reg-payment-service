@@ -3,6 +3,8 @@ package v1transactions
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -70,7 +72,11 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 	var req GetTransactionsRequest
 
 	// debID is required
-	debID, err := strconv.Atoi(chi.URLParamFromCtx(ctx, "debitor_id"))
+	debIDStr := chi.URLParamFromCtx(ctx, "debitor_id")
+	if debIDStr == "" {
+		return nil, errors.New("no Debitor ID was provided")
+	}
+	debID, err := strconv.Atoi(debIDStr)
 	if err != nil {
 		return nil, err
 	}
@@ -101,15 +107,24 @@ func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.Respons
 		return common.ErrorFromMessage(common.TransactionDataInvalidMessage)
 	}
 
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
 	var request CreateTransactionRequest
 
-	err := json.NewDecoder(r.Body).Decode(&request)
+	err := json.NewDecoder(r.Body).Decode(&request.Transaction)
 
 	if err != nil {
+		return nil, err
+	}
+
+	if err := validateTransaction(&request.Transaction); err != nil {
 		return nil, err
 	}
 
@@ -129,6 +144,10 @@ func updateTransactionResponseHandler(res *UpdateTransactionResponse, w http.Res
 	return nil
 }
 
+// Effective dates are only valid for an exact day without time.
+// We will parse them in the ISO 8601 (yyyy-mm-dd) format without time
+//
+// If `effDate` is emty, we will return a zero time instead
 func parseEffectiveDate(effDate string) (time.Time, error) {
 	if effDate != "" {
 		parsed, err := time.Parse("2006-01-02", effDate)
@@ -140,4 +159,38 @@ func parseEffectiveDate(effDate string) (time.Time, error) {
 	}
 
 	return time.Time{}, nil
+}
+
+func validateTransaction(t *Transaction) error {
+
+	// Todo validation
+	/*
+			      required:
+		        - amount
+		        - status
+		        - effective_date
+	*/
+
+	// 0 is not a valid debitor ID
+	if t.DebitorID <= 0 {
+		return fmt.Errorf("invalid debitor id supplied - DebitorID: %d", t.DebitorID)
+	}
+
+	if !t.TransactionType.IsValid() {
+		return fmt.Errorf("invalid transaction type - TransactionType: %s", string(t.TransactionType))
+	}
+
+	if !t.Method.IsValid() {
+		return fmt.Errorf("invalid payment method - Method: %s", string(t.Method))
+	}
+
+	// We cannot validate the status when creating a new transaction. Therefore the status cannot be required, right?
+	//
+	// This requires some more information @Jumpy
+
+	// if !t.Status.IsValid() {
+	// 	return fmt.Errorf("invalid transaction status - Method: %s", string(t.Status))
+	// }
+
+	return nil
 }

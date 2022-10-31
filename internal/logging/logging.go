@@ -4,8 +4,9 @@ import (
 	"context"
 	"os"
 
-	"github.com/eurofurence/reg-payment-service/internal/common"
 	"github.com/rs/zerolog"
+
+	"github.com/eurofurence/reg-payment-service/internal/common"
 )
 
 type Logger interface {

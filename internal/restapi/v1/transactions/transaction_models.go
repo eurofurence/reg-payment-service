@@ -9,15 +9,33 @@ const (
 	TransactionTypePayement TransactionType = "payment"
 )
 
-type PayementMethod string
+func (t TransactionType) IsValid() bool {
+	switch t {
+	case TransactionTypeDue, TransactionTypePayement:
+		return true
+	}
+
+	return false
+}
+
+type PaymentMethod string
 
 const (
-	PaymentMethodCredit   PayementMethod = "credit"
-	PaymentMethodPaypal   PayementMethod = "paypal"
-	PaymentMethodTransfer PayementMethod = "transfer"
-	PaymentMethodInternal PayementMethod = "internal"
-	PaymentMethodGift     PayementMethod = "gift"
+	PaymentMethodCredit   PaymentMethod = "credit"
+	PaymentMethodPaypal   PaymentMethod = "paypal"
+	PaymentMethodTransfer PaymentMethod = "transfer"
+	PaymentMethodInternal PaymentMethod = "internal"
+	PaymentMethodGift     PaymentMethod = "gift"
 )
+
+func (p PaymentMethod) IsValid() bool {
+	switch p {
+	case PaymentMethodCredit, PaymentMethodPaypal, PaymentMethodTransfer, PaymentMethodInternal, PaymentMethodGift:
+		return true
+	}
+
+	return false
+}
 
 type TransactionStatus string
 
@@ -27,6 +45,15 @@ const (
 	TransactionStatusValid     TransactionStatus = "valid"
 	TransactionStatusDeleted   TransactionStatus = "deleted"
 )
+
+func (t TransactionStatus) IsValid() bool {
+	switch t {
+	case TransactionStatusTentative, TransactionStatusPending, TransactionStatusValid, TransactionStatusDeleted:
+		return true
+	}
+
+	return false
+}
 
 // GetTransactionsRequest will contain all information that will be sent from the
 // client during calling the GetTransactions endpoint
@@ -42,6 +69,7 @@ type GetTransactionsRequest struct {
 }
 
 type GetTransactionsResponse struct {
+	Payload []Transaction `json:"payload"`
 }
 
 type Amount struct {
@@ -64,10 +92,21 @@ type StatusHistory struct {
 
 // CreateTrasactionRequest contains all information to create a new transaction for a given debitor
 type CreateTransactionRequest struct {
+	Transaction Transaction `json:"transaction"`
+}
+
+type CreateTransactionResponse struct {
+}
+
+type UpdateTransactionRequest struct{}
+
+type UpdateTransactionResponse struct{}
+
+type Transaction struct {
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
 	TransactionType       TransactionType             `json:"transaciont_type"`
-	Method                PayementMethod              `json:"method"`
+	Method                PaymentMethod               `json:"method"`
 	Amount                Amount                      `json:"amount"`
 	Comment               string                      `json:"comment"`
 	Status                TransactionStatus           `json:"status"`
@@ -78,10 +117,3 @@ type CreateTransactionRequest struct {
 	CreationDate          time.Time                   `json:"creation_date"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }
-
-type CreateTransactionResponse struct {
-}
-
-type UpdateTransactionRequest struct{}
-
-type UpdateTransactionResponse struct{}

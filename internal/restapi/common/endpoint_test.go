@@ -11,9 +11,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
 type testRequest struct {
@@ -184,6 +185,7 @@ func TestCreateHandler(t *testing.T) {
 			require.NotNil(t, resp)
 
 			b, err := io.ReadAll(resp.Body)
+			require.NoError(t, resp.Body.Close())
 			require.NoError(t, err)
 
 			fmt.Println(string(b))
