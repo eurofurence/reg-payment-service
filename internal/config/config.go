@@ -7,6 +7,15 @@ import (
 )
 
 type (
+	DatabaseType string
+)
+
+const (
+	Mysql    DatabaseType = "mysql"
+	Inmemory DatabaseType = "inmemory"
+)
+
+type (
 	// Application is the root configuration type
 	// that holds all other subconfiguration types
 	Application struct {
@@ -36,11 +45,11 @@ type (
 	// DatabaseConfig contains all required configuration
 	// values for database related tasks
 	DatabaseConfig struct {
-		Use        string   `yaml:"use"`
-		Username   string   `yaml:"username"`
-		Password   string   `yaml:"password"`
-		Database   string   `yaml:"database"`
-		Parameters []string `yaml:"parameters"`
+		Use        DatabaseType `yaml:"use"`
+		Username   string       `yaml:"username"`
+		Password   string       `yaml:"password"`
+		Database   string       `yaml:"database"`
+		Parameters []string     `yaml:"parameters"`
 	}
 )
 
