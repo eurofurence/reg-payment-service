@@ -36,7 +36,7 @@ func NewServer(ctx context.Context, conf *config.ServerConfig, router http.Handl
 	}
 }
 
-func CreateRouter(i interaction.Interactor, conf config.ServiceConfig) chi.Router {
+func CreateRouter(i interaction.Interactor, conf config.SecurityConfig) chi.Router {
 	router := chi.NewRouter()
 
 	router.Use(chimiddleware.Recoverer)
@@ -49,11 +49,11 @@ func CreateRouter(i interaction.Interactor, conf config.ServiceConfig) chi.Route
 	return router
 }
 
-func setupV1Routes(router chi.Router, i interaction.Interactor, conf config.ServiceConfig) {
+func setupV1Routes(router chi.Router, i interaction.Interactor, conf config.SecurityConfig) {
 	v1health.Create(router)
 
 	router.Route("/api/rest/v1", func(r chi.Router) {
-		r.Use(middleware.TokenHandlerMiddleware(conf.ServiceToken))
+		r.Use(middleware.TokenHandlerMiddleware(conf.Fixed.Api))
 		v1transactions.Create(r, i)
 	})
 }

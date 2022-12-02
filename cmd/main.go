@@ -65,7 +65,7 @@ func main() {
 	})
 
 	logger.Debug("Setting up router")
-	handler := server.CreateRouter(i, conf.Service)
+	handler := server.CreateRouter(i, conf.Security)
 
 	logger.Debug("setting up server")
 	srv := server.NewServer(ctx, &conf.Server, handler)
@@ -83,7 +83,7 @@ func main() {
 		}
 	}()
 
-	logger.Info("Running service on port ", conf.Server.Port)
+	logger.Info("Running service on port %d", conf.Server.Port)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		logger.Fatal("Server closed unexpectedly. [error]: %v", err)
 	}
