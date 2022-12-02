@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"net/http"
 	"path/filepath"
 
@@ -44,7 +45,13 @@ func main() {
 	}
 
 	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
-		return mysql.NewMySQLConnector(conf.Database, logger)
+		if conf.Database.Use == config.Mysql {
+			return mysql.NewMySQLConnector(conf.Database, logger)
+		} else if conf.Database.Use == config.Inmemory {
+			return inmemory.NewInMemoryProvider(), nil
+		} else {
+			return nil, errors.New("invalid configuration")
+		}
 	})
 
 	if err := repo.Migrate(); err != nil {
