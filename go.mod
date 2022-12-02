@@ -8,7 +8,7 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/rs/zerolog v1.28.0
 	gorm.io/driver/mysql v1.4.3
-	gorm.io/gorm v1.24.0
+	gorm.io/gorm v1.24.2
 )
 
 require (
