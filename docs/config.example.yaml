@@ -49,3 +49,6 @@ security:
     disable: false
     # if setting disable_cors to true, you should also specify this, as a comma separated list of allowed origins
     allow_origin: 'http://localhost:8000,http://localhost:8001'
+logging:
+  severity: INFO
+  style: plain # or ecs (elastic common schema), the default
