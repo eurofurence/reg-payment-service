@@ -7,7 +7,7 @@ require (
 	github.com/go-http-utils/headers v0.0.0-20181008091004-fed159eddc2a
 	github.com/google/uuid v1.3.0
 	github.com/rs/zerolog v1.28.0
-	gorm.io/driver/mysql v1.4.3
+	gorm.io/driver/mysql v1.4.4
 	gorm.io/gorm v1.24.2
 )
 
