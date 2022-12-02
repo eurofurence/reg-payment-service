@@ -21,7 +21,7 @@ import (
 type TransactionLog struct {
 	gorm.Model
 	TransactionID       string            `gorm:"type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
-	DebitorID           string            `gorm:"type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
+	DebitorID           int64             `gorm:"type:bigint;NOT NULL"`
 	TransactionTypeID   uint              `gorm:"NOT NULL"`
 	TransactionType     TransactionType   `gorm:"constraint:OnUpdate:CASCADE;NOT NULL"`
 	PaymentMethodID     uint              `gorm:"NOT NULL"`

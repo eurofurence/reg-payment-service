@@ -1,52 +1,196 @@
 package v1transactions
 
 import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
-	"github.com/eurofurence/reg-payment-service/internal/restapi/types"
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
-type transactionHandler struct {
-	interactor interaction.Interactor
-}
-
 func Create(router chi.Router, i interaction.Interactor) {
-	handler := transactionHandler{
-		interactor: i,
-	}
+	router.Get("/transactions/{debitor_id}",
+		common.CreateHandler(
+			MakeGetTransactionsEndpoint(i),
+			getTransactionsRequestHandler,
+			getTransactionsResponseHandler),
+	)
 
-	router.Get("/transactions/{debitor_id}", handler.handleTransactionsGet)
-	router.Post("/transactions", handler.handleTransactionsPost)
+	router.Post("/transactions",
+		common.CreateHandler(
+			MakeCreateTransactionEndpoint(i),
+			createTransactionRequestHandler,
+			createTransactionResponseHandler),
+	)
+
+	router.Put("/transactions/{id}",
+		common.CreateHandler(
+			MakeUpdateTransactionEndpoint(i),
+			updateTransactionRequestHandler,
+			updateTransactionResponseHandler),
+	)
 }
 
-func (t *transactionHandler) handleTransactionsGet(w http.ResponseWriter, r *http.Request) {
-	dID := chi.URLParamFromCtx(r.Context(), "debitor_id")
+func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
+	return func(ctx context.Context, request *GetTransactionsRequest, logger logging.Logger) (*GetTransactionsResponse, error) {
+		_, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
 
-	ctx := r.Context()
-
-	result, err := t.interactor.GetTransactionsForDebitor(ctx, dID)
-	if err != nil {
-		logging.Ctx(ctx).Error(err)
-		respErr := types.
-			NewErrorResponse(err, http.StatusInternalServerError).
-			EncodeToJSON(w)
-
-		if respErr != nil {
-			logging.Ctx(ctx).Error(err)
+		if err != nil {
+			logger.Error("Could not get transactions. [error]: %v", err)
+			return nil, err
 		}
 
-		return
-	}
-
-	if err := types.NewResponse(result, http.StatusOK).EncodeToJSON(w); err != nil {
-		logging.Ctx(ctx).Error(err)
+		return nil, nil
 	}
 }
 
-func (t *transactionHandler) handleTransactionsPost(w http.ResponseWriter, r *http.Request) {
-	// TODO implement
+func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
+	return func(ctx context.Context, request *CreateTransactionRequest, logger logging.Logger) (*CreateTransactionResponse, error) {
+
+		return nil, nil
+	}
+}
+
+func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[UpdateTransactionRequest, UpdateTransactionResponse] {
+	return func(ctx context.Context, request *UpdateTransactionRequest, logger logging.Logger) (*UpdateTransactionResponse, error) {
+
+		return nil, nil
+	}
+}
+
+func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, error) {
+	ctx := r.Context()
+
+	var req GetTransactionsRequest
+
+	// debID is required
+	debIDStr := chi.URLParamFromCtx(ctx, "debitor_id")
+	if debIDStr == "" {
+		return nil, errors.New("no Debitor ID was provided")
+	}
+	debID, err := strconv.Atoi(debIDStr)
+	if err != nil {
+		return nil, err
+	}
+
+	req.DebitorID = int64(debID)
+
+	req.TransactionIdentifier = chi.URLParamFromCtx(ctx, "transaction_identifier")
+
+	efFrom, err := parseEffectiveDate(chi.URLParamFromCtx(ctx, "effective_from"))
+	if err != nil {
+		return nil, err
+	}
+
+	req.EffectiveFrom = efFrom
+
+	efBef, err := parseEffectiveDate(chi.URLParamFromCtx(ctx, "effective_before"))
+	if err != nil {
+		return nil, err
+	}
+
+	req.EffectiveBefore = efBef
+
+	return &req, nil
+}
+
+func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.ResponseWriter) error {
+	if res == nil {
+		return common.ErrorFromMessage(common.TransactionDataInvalidMessage)
+	}
+
+	err := json.NewEncoder(w).Encode(res)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
+	var request CreateTransactionRequest
+
+	err := json.NewDecoder(r.Body).Decode(&request.Transaction)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateTransaction(&request.Transaction); err != nil {
+		return nil, err
+	}
+
+	return &request, nil
+}
+
+func createTransactionResponseHandler(res *CreateTransactionResponse, w http.ResponseWriter) error {
+
+	return nil
+}
+
+func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
+	return nil, nil
+}
+
+func updateTransactionResponseHandler(res *UpdateTransactionResponse, w http.ResponseWriter) error {
+	return nil
+}
+
+// Effective dates are only valid for an exact day without time.
+// We will parse them in the ISO 8601 (yyyy-mm-dd) format without time
+//
+// If `effDate` is emty, we will return a zero time instead
+func parseEffectiveDate(effDate string) (time.Time, error) {
+	if effDate != "" {
+		parsed, err := time.Parse("2006-01-02", effDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		return parsed, nil
+	}
+
+	return time.Time{}, nil
+}
+
+func validateTransaction(t *Transaction) error {
+
+	// Todo validation
+	/*
+			      required:
+		        - amount
+		        - status
+		        - effective_date
+	*/
+
+	// 0 is not a valid debitor ID
+	if t.DebitorID <= 0 {
+		return fmt.Errorf("invalid debitor id supplied - DebitorID: %d", t.DebitorID)
+	}
+
+	if !t.TransactionType.IsValid() {
+		return fmt.Errorf("invalid transaction type - TransactionType: %s", string(t.TransactionType))
+	}
+
+	if !t.Method.IsValid() {
+		return fmt.Errorf("invalid payment method - Method: %s", string(t.Method))
+	}
+
+	// We cannot validate the status when creating a new transaction. Therefore the status cannot be required, right?
+	//
+	// This requires some more information @Jumpy
+
+	// if !t.Status.IsValid() {
+	// 	return fmt.Errorf("invalid transaction status - Method: %s", string(t.Status))
+	// }
+
+	return nil
 }

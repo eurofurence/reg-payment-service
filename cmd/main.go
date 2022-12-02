@@ -27,55 +27,58 @@ var errHelpRequested = errors.New("help text was requested")
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
+	logger := logging.NewLogger()
+
+	ctx = context.WithValue(ctx, logging.LoggerKey, logger)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	logging.Ctx(ctx).Debug("loading configuration")
+	logger.Debug("loading configuration")
 	conf, err := parseArgsAndReadConfig()
 	if err != nil {
 		if !errors.Is(err, errHelpRequested) {
-			logging.Ctx(ctx).Fatal(err)
+			logger.Fatal("%v", err)
 		}
 		os.Exit(0)
 	}
 
-	repo := constructOrFail(ctx, func() (database.Repository, error) {
-		return mysql.NewMySQLConnector(conf.Database)
+	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
+		return mysql.NewMySQLConnector(conf.Database, logger)
 	})
 
 	if err := repo.Migrate(); err != nil {
-		logging.Ctx(ctx).Fatal(err)
+		logger.Fatal("%v", err)
 	}
 
 	playDatabase(ctx, repo)
 
-	i := constructOrFail(ctx, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo)
+	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
+		return interaction.NewServiceInteractor(repo, logger)
 	})
 
-	logging.Ctx(ctx).Debug("Setting up router")
+	logger.Debug("Setting up router")
 	handler := server.CreateRouter(i, conf.Service)
 
-	logging.Ctx(ctx).Debug("setting up server")
+	logger.Debug("setting up server")
 	srv := server.NewServer(ctx, &conf.Server, handler)
 
 	go func() {
 		<-sig
 		defer cancel()
-		logging.Ctx(ctx).Info("Stopping services now")
+		logger.Info("Stopping services now")
 
 		tCtx, tcancel := context.WithTimeout(ctx, time.Second*5)
 		defer tcancel()
 
 		if err := srv.Shutdown(tCtx); err != nil {
-			logging.Ctx(ctx).Fatal("Couldn't shutdown server gracefully")
+			logger.Fatal("Couldn't shutdown server gracefully")
 		}
 	}()
 
-	logging.Ctx(ctx).Info("Running service on port ", conf.Server.Port)
+	logger.Info("Running service on port ", conf.Server.Port)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
-		logging.Ctx(ctx).Fatal("Server closed unexpectedly", err)
+		logger.Fatal("Server closed unexpectedly. [error]: %v", err)
 	}
 }
 
@@ -100,7 +103,6 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 		flag.PrintDefaults()
 		return nil, errors.New("no config file was provided")
 	}
-	logging.NoCtx().Debug()
 
 	fi, err := os.Stat(configFilePath)
 	if err != nil {
@@ -119,14 +121,15 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 	return config.UnmarshalFromYamlConfiguration(f)
 }
 
-func constructOrFail[T any](ctx context.Context, constructor func() (T, error)) T {
+func constructOrFail[T any](ctx context.Context, logger logging.Logger, constructor func() (T, error)) T {
+	const failMsg = "Construction failed. [error]: %v"
 	if constructor == nil {
-		logging.Ctx(ctx).Fatal(errors.New("construction func must not be nil"))
+		logger.Fatal(failMsg, errors.New("construction func must not be nil"))
 	}
 
 	t, err := constructor()
 	if err != nil {
-		logging.Ctx(ctx).Fatal(err)
+		logger.Fatal(failMsg, err)
 	}
 
 	return t
@@ -134,21 +137,22 @@ func constructOrFail[T any](ctx context.Context, constructor func() (T, error)) 
 }
 
 func playDatabase(ctx context.Context, r database.Repository) {
+	logger := logging.NewLogger()
 	// TODO use test function to test again mysql db.
 	err := testCreateTransaction(ctx, r)
 	if err != nil {
 		if !errors.Is(err, mysql.ErrTransactionExists) {
-			logging.Ctx(ctx).Fatal(err)
+			logger.Fatal("An error occurred. [error]: %v", err)
 		}
 
 		dt := defaultTransaction()
 
 		dt.Comment = "Hello1"
 		dt.TransactionStatusID = uint(domain.Valid)
-		dt.DebitorID = "new-deb1"
+		dt.DebitorID = 1
 		err = testUpdateTransaction(ctx, r, dt)
 		if err != nil {
-			logging.Ctx(ctx).Fatal(err)
+			logger.Fatal("An error occurred. [error]: %v", err)
 		}
 
 	}
@@ -166,7 +170,7 @@ func testUpdateTransaction(ctx context.Context, r database.Repository, tr entiti
 func defaultTransaction() entities.Transaction {
 	return entities.Transaction{
 		TransactionID:     "123456789",
-		DebitorID:         "1",
+		DebitorID:         1,
 		TransactionTypeID: uint(domain.Due),
 		TransactionType: entities.TransactionType{
 			Description: "Due",

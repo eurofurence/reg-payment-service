@@ -30,6 +30,6 @@ func writeJson(ctx context.Context, w http.ResponseWriter, v interface{}) {
 	encoder.SetEscapeHTML(false)
 	err := encoder.Encode(v)
 	if err != nil {
-		logging.Ctx(ctx).Warn(fmt.Sprintf("error while encoding json response: %v", err))
+		logging.LoggerFromContext(ctx).Warn(fmt.Sprintf("error while encoding json response: %v", err))
 	}
 }

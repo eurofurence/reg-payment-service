@@ -71,7 +71,7 @@ type Deletion struct {
 
 type Transaction struct {
 	ID            string
-	DebitorID     string
+	DebitorID     int64
 	Type          TransactionType
 	Method        PaymentMethod
 	Amount        Amount

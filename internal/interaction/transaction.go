@@ -2,36 +2,13 @@ package interaction
 
 import (
 	"context"
-	"errors"
 
 	"github.com/eurofurence/reg-payment-service/internal/domain"
-	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 )
 
-var _ Interactor = (*serviceInteractor)(nil)
-
-type Interactor interface {
-	GetTransactionsForDebitor(ctx context.Context, debitorID string) ([]domain.Transaction, error)
-	CreateTransaction(ctx context.Context, tran *domain.Transaction) error
-}
-
-type serviceInteractor struct {
-	store database.Repository
-}
-
-func NewServiceInteractor(r database.Repository) (Interactor, error) {
-	if r == nil {
-		return nil, errors.New("repository must not be nil")
-	}
-
-	return &serviceInteractor{
-		store: r,
-	}, nil
-}
-
-func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID string) ([]domain.Transaction, error) {
-	eTran, err := s.store.GetTransactionsByDebitorID(ctx, debitorID)
+func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID int64) ([]domain.Transaction, error) {
+	eTran, err := s.store.GetTransactionsByFilter(ctx, debitorID)
 	if err != nil {
 		return nil, err
 	}

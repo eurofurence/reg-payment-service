@@ -6,13 +6,11 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
+
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
 var RequestIDHeader = "X-Request-Id"
-
-type ctxKeyRequestID int
-
-const RequestIDKey ctxKeyRequestID = 0
 
 var ValidRequestIdRegex = regexp.MustCompile("^[0-9a-f]{8}$")
 
@@ -29,7 +27,7 @@ func createReqIdHandler(next http.Handler) func(w http.ResponseWriter, r *http.R
 			}
 		}
 		ctx := r.Context()
-		newCtx := context.WithValue(ctx, RequestIDKey, reqUuidStr)
+		newCtx := context.WithValue(ctx, common.RequestIDKey, reqUuidStr)
 		r = r.WithContext(newCtx)
 
 		next.ServeHTTP(w, r)
@@ -44,14 +42,4 @@ func RequestIdMiddleware() func(http.Handler) http.Handler {
 		return http.HandlerFunc(createReqIdHandler(next))
 	}
 	return middlewareCreator
-}
-
-func GetRequestID(ctx context.Context) string {
-	if ctx == nil {
-		return "00000000"
-	}
-	if reqID, ok := ctx.Value(RequestIDKey).(string); ok {
-		return reqID
-	}
-	return "ffffffff"
 }
