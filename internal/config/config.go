@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/rsa"
 	"io"
 
 	"gopkg.in/yaml.v3"
@@ -88,6 +89,12 @@ type (
 		Severity string   `yaml:"severity"`
 	}
 )
+
+var parsedKeySet []*rsa.PublicKey
+
+func OidcKeySet() []*rsa.PublicKey {
+	return parsedKeySet
+}
 
 // UnmarshalFromYamlConfiguration decodes yaml data from an `io.Reader` interface.
 func UnmarshalFromYamlConfiguration(file io.Reader) (*Application, error) {

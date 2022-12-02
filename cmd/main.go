@@ -36,7 +36,7 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	logger.Debug("loading configuration")
-	conf, err := parseArgsAndReadConfig()
+	conf, err := parseArgsAndReadConfig(logger)
 	if err != nil {
 		if !errors.Is(err, errHelpRequested) {
 			logger.Fatal("%v", err)
@@ -89,7 +89,7 @@ func main() {
 	}
 }
 
-func parseArgsAndReadConfig() (*config.Application, error) {
+func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) {
 	var showHelp, migrate bool
 	var configFilePath string
 
@@ -125,7 +125,16 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 		return nil, err
 	}
 
-	return config.UnmarshalFromYamlConfiguration(f)
+	conf, err := config.UnmarshalFromYamlConfiguration(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := config.Validate(conf, logger.Warn); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }
 
 func constructOrFail[T any](ctx context.Context, logger logging.Logger, constructor func() (T, error)) T {

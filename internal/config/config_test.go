@@ -2,6 +2,8 @@ package config
 
 import (
 	"bytes"
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,7 +11,9 @@ import (
 
 func TestUnmarshalConfig(t *testing.T) {
 	s := []byte(`service:
-  name: 'TestServiceName' 
+  name: 'TestServiceName'
+  attendee_service: 'http://localhost:9091'
+  provider_adapter: 'http://localhost:9097'
 server:
   port: 8080
   read_timeout_seconds: 30
@@ -27,11 +31,22 @@ security:
   cors:
     disable: true
     allow_origin: 'http://localhost:8000,http://localhost:8001'
+logging:
+  severity: INFO
 `)
 
 	b := bytes.NewBuffer(s)
 
 	conf, err := UnmarshalFromYamlConfiguration(b)
+	require.NoError(t, err)
+
+	logRecording := strings.Builder{}
+	logFunc := func(format string, v ...interface{}) {
+		logRecording.WriteString(fmt.Sprintf(format, v...))
+		logRecording.WriteString("\n")
+	}
+	err = Validate(conf, logFunc)
+	require.Equal(t, "", logRecording.String())
 	require.NoError(t, err)
 
 	require.NotNil(t, conf)
@@ -92,4 +107,60 @@ sucurity_with_typo_we_want_to_detect:
 	require.Contains(t, err.Error(), "sucurity_with_typo_we_want_to_detect")
 
 	require.Nil(t, conf)
+}
+
+func TestValidationErrors1(t *testing.T) {
+	s := []byte(`service:
+  name: 'TestServiceName'
+  attendee_service: 'kittycat'
+server:
+  port: -77
+  read_timeout_seconds: 0
+  write_timeout_seconds: 8127368
+  idle_timeout_seconds: -70
+database:
+  use: papyrus
+security:
+  fixed_token:
+    api: 'too-short'
+  oidc:
+    token_cookie_name: 'JWT'
+    token_public_keys_PEM:
+      - |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w
+        -----END PUBLIC KEY-----
+  cors:
+    disable: true
+    allow_origin: 'http://localhost:8000,http://localhost:8001'
+logging:
+  severity: CAT
+`)
+
+	b := bytes.NewBuffer(s)
+
+	conf, err := UnmarshalFromYamlConfiguration(b)
+	require.NoError(t, err)
+
+	logRecording := strings.Builder{}
+	logFunc := func(format string, v ...interface{}) {
+		logRecording.WriteString(fmt.Sprintf(format, v...))
+		logRecording.WriteString("\n")
+	}
+	err = Validate(conf, logFunc)
+
+	expected := `configuration error: database.use: must be one of mysql, inmemory
+configuration error: logging.severity: must be one of DEBUG, INFO, WARN, ERROR
+configuration error: security.fixed_token.api: security.fixed_token.api field must be at least 16 and at most 256 characters long
+configuration error: security.oidc.admin_role: security.oidc.admin_role field must be at least 1 and at most 256 characters long
+configuration error: security.oidc.token_public_keys_PEM[0]: failed to parse RSA public key in PEM format: invalid key: Key must be a PEM encoded PKCS1 or PKCS8 key
+configuration error: server.idle_timeout_seconds: server.idle_timeout_seconds field must be an integer at least 1 and at most 300
+configuration error: server.port: server.port field must be an integer at least 1 and at most 65535
+configuration error: server.read_timeout_seconds: server.read_timeout_seconds field must be an integer at least 1 and at most 300
+configuration error: server.write_timeout_seconds: server.write_timeout_seconds field must be an integer at least 1 and at most 300
+configuration error: service.attendee_service: base url must start with http:// or https:// and may not end in a /
+configuration error: service.provider_adapter: base url must start with http:// or https:// and may not end in a /
+`
+	require.Equal(t, expected, logRecording.String())
+	require.Error(t, err)
 }
