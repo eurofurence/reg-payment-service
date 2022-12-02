@@ -8,14 +8,14 @@ import (
 )
 
 func TestUnmarshalConfig(t *testing.T) {
-	s := []byte(`serviceConfig:
+	s := []byte(`service:
   name: "TestServiceName" 
-serverConfig:
+server:
   port: 8080
-  readTimeoutSeconds: 30
-  writeTimeoutSeconds: 30
-  idleTimeoutSeconds: 120 
-corsDisabled: true
+  read_timeout_seconds: 30
+  write_timeout_seconds: 30
+  idle_timeout_seconds: 120
+cors_disabled: true
 `)
 
 	b := bytes.NewBuffer(s)
@@ -38,14 +38,14 @@ corsDisabled: true
 
 func TestUnmarshalConfigInvalid(t *testing.T) {
 	s := []byte(`---
-serviceConfig:
+service:
     name: "TestServiceName" 
-serverConfig:
+server:
 port: 8080
-readTimeoutSeconds: 30
-        writeTimeoutSeconds: 30
-idleTimeoutSeconds: 120 
-    corsDisabled: true
+read_timeout_seconds: 30
+        write_timeout_seconds: 30
+idle_timeout_seconds: 120
+    cors_disabled: true
 `)
 
 	b := bytes.NewBuffer(s)

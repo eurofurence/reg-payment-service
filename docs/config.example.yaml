@@ -1,11 +1,11 @@
-serviceConfig:
+service:
   name: "Registration Payment Service" 
-  token: "cf8dd87c-3da0-4f56-9ab3-56ee636e6ca6"
-serverConfig:
-  port: 8080
-  readTimeoutSeconds: 30
-  writeTimeoutSeconds: 30
-  idleTimeoutSeconds: 120 
+  token: "put_secure_random_string_here_for_api_token"
+server:
+  port: 9092
+  read_timeout_seconds: 30
+  write_timeout_seconds: 30
+  idle_timeout_seconds: 120
 database:
   use: mysql #or inmemory
   username: 'demouser'
@@ -16,5 +16,5 @@ database:
     - 'collation=utf8mb4_general_ci'
     - 'parseTime=True'
     - 'timeout=30s' # connection timeout
-corsDisabled: false
+cors_disabled: false
 

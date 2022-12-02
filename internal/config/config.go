@@ -19,20 +19,20 @@ type (
 	// Application is the root configuration type
 	// that holds all other subconfiguration types
 	Application struct {
-		Service        ServiceConfig  `yaml:"serviceConfig"`
-		Server         ServerConfig   `yaml:"serverConfig"`
+		Service        ServiceConfig  `yaml:"service"`
+		Server         ServerConfig   `yaml:"server"`
 		Database       DatabaseConfig `yaml:"database"`
-		IsCorsDisabled bool           `yaml:"corsDisabled"`
+		IsCorsDisabled bool           `yaml:"cors_disabled"`
 	}
 
 	// ServerConfig contains all values for
 	// http releated configuration
 	ServerConfig struct {
-		BaseAddress  string `yaml:"baseAddress"`
+		BaseAddress  string `yaml:"address"`
 		Port         int    `yaml:"port"`
-		ReadTimeout  int    `yaml:"readTimeoutSeconds"`
-		WriteTimeout int    `yaml:"writeTimeoutSeconds"`
-		IdleTimeout  int    `yaml:"idleTimeoutSeconds"`
+		ReadTimeout  int    `yaml:"read_timeout_seconds"`
+		WriteTimeout int    `yaml:"write_timeout_seconds"`
+		IdleTimeout  int    `yaml:"idle_timeout_seconds"`
 	}
 
 	// ServiceConfig contains configuration values
