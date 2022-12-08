@@ -1,11 +1,12 @@
-serviceConfig:
-  name: "Registration Payment Service" 
-  token: "cf8dd87c-3da0-4f56-9ab3-56ee636e6ca6"
-serverConfig:
-  port: 8080
-  readTimeoutSeconds: 30
-  writeTimeoutSeconds: 30
-  idleTimeoutSeconds: 120 
+service:
+  name: 'Registration Payment Service'
+  attendee_service: 'http://localhost:9091' # do not include trailing slash
+  provider_adapter: 'http://localhost:9097' # do not include trailing slash
+server:
+  port: 9092
+  read_timeout_seconds: 30
+  write_timeout_seconds: 30
+  idle_timeout_seconds: 120
 database:
   use: mysql #or inmemory
   username: 'demouser'
@@ -16,5 +17,38 @@ database:
     - 'collation=utf8mb4_general_ci'
     - 'parseTime=True'
     - 'timeout=30s' # connection timeout
-corsDisabled: false
-
+security:
+  fixed_token:
+    api: 'put_secure_random_string_here_for_api_token'
+  oidc:
+    # set this nonempty to also try to read the jwt token from a cookie (Authorization header with Bearer token is always tried)
+    token_cookie_name: 'JWT'
+    # a list of public RSA keys in PEM format, see https://github.com/Jumpy-Squirrel/jwks2pem for obtaining PEM from openid keyset endpoint
+    # this is held locally so token validation can be done locally, especially on local installations that do not actually have an IDP.
+    token_public_keys_PEM:
+      - |
+        -----BEGIN PUBLIC KEY-----
+        MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnzyis1ZjfNB0bBgKFMSv
+        vkTtwlvBsaJq7S5wA+kzeVOVpVWwkWdVha4s38XM/pa/yr47av7+z3VTmvDRyAHc
+        aT92whREFpLv9cj5lTeJSibyr/Mrm/YtjCZVWgaOYIhwrXwKLqPr/11inWsAkfIy
+        tvHWTxZYEcXLgAXFuUuaS3uF9gEiNQwzGTU1v0FqkqTBr4B8nW3HCN47XUu0t8Y0
+        e+lf4s4OxQawWD79J9/5d3Ry0vbV3Am1FtGJiJvOwRsIfVChDpYStTcHTCMqtvWb
+        V6L11BWkpzGXSW4Hv43qa+GSYOD2QU68Mb59oSk2OB+BtOLpJofmbGEGgvmwyCI9
+        MwIDAQAB
+        -----END PUBLIC KEY-----
+    # if configured, this is used to verify the token for critical requests (such as admin access).
+    #
+    # no check is made for requests like health checks
+    #
+    # if not configured (local development), the JWT signature is checked against the public key only,
+    # the expiry time is checked, and the claims are verified.
+    user_info_url: 'https://my-identity-provider/oauth2/userinfo'
+    admin_role: 'admin'
+  cors:
+    # set this to true to send disable cors headers - not for production - local/test instances only - will log lots of warnings
+    disable: false
+    # if setting disable_cors to true, you should also specify this, as a comma separated list of allowed origins
+    allow_origin: 'http://localhost:8000,http://localhost:8001'
+logging:
+  severity: INFO
+  style: plain # or ecs (elastic common schema), the default

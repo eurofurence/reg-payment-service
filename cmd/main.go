@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"net/http"
 	"path/filepath"
 
@@ -35,7 +36,7 @@ func main() {
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	logger.Debug("loading configuration")
-	conf, err := parseArgsAndReadConfig()
+	conf, err := parseArgsAndReadConfig(logger)
 	if err != nil {
 		if !errors.Is(err, errHelpRequested) {
 			logger.Fatal("%v", err)
@@ -44,7 +45,13 @@ func main() {
 	}
 
 	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
-		return mysql.NewMySQLConnector(conf.Database, logger)
+		if conf.Database.Use == config.Mysql {
+			return mysql.NewMySQLConnector(conf.Database, logger)
+		} else if conf.Database.Use == config.Inmemory {
+			return inmemory.NewInMemoryProvider(), nil
+		} else {
+			return nil, errors.New("invalid configuration")
+		}
 	})
 
 	if err := repo.Migrate(); err != nil {
@@ -58,7 +65,7 @@ func main() {
 	})
 
 	logger.Debug("Setting up router")
-	handler := server.CreateRouter(i, conf.Service)
+	handler := server.CreateRouter(i, conf.Security)
 
 	logger.Debug("setting up server")
 	srv := server.NewServer(ctx, &conf.Server, handler)
@@ -76,13 +83,13 @@ func main() {
 		}
 	}()
 
-	logger.Info("Running service on port ", conf.Server.Port)
+	logger.Info("Running service on port %d", conf.Server.Port)
 	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		logger.Fatal("Server closed unexpectedly. [error]: %v", err)
 	}
 }
 
-func parseArgsAndReadConfig() (*config.Application, error) {
+func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) {
 	var showHelp, migrate bool
 	var configFilePath string
 
@@ -118,7 +125,16 @@ func parseArgsAndReadConfig() (*config.Application, error) {
 		return nil, err
 	}
 
-	return config.UnmarshalFromYamlConfiguration(f)
+	conf, err := config.UnmarshalFromYamlConfiguration(f)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := config.Validate(conf, logger.Warn); err != nil {
+		return nil, err
+	}
+
+	return conf, nil
 }
 
 func constructOrFail[T any](ctx context.Context, logger logging.Logger, constructor func() (T, error)) T {
