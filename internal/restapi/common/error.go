@@ -23,6 +23,8 @@ const (
 	TransactionDataDuplicateMessage APIErrorMessage = "transaction.data.duplicate"
 	// database error
 	TransactionWriteErrorMessage APIErrorMessage = "transaction.write.error"
+	// database error
+	TransactionReadErrorMessage APIErrorMessage = "transaction.read.error"
 	// adapter failure while creating payment link
 	TransactionPaylingErrorMessage APIErrorMessage = "transaction.paylink.error"
 	// no such transaction in the database

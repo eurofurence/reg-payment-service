@@ -3,7 +3,6 @@ package v1transactions
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -17,7 +16,7 @@ import (
 )
 
 func Create(router chi.Router, i interaction.Interactor) {
-	router.Get("/transactions/{debitor_id}",
+	router.Get("/transactions",
 		common.CreateHandler(
 			MakeGetTransactionsEndpoint(i),
 			getTransactionsRequestHandler,
@@ -41,14 +40,18 @@ func Create(router chi.Router, i interaction.Interactor) {
 
 func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
 	return func(ctx context.Context, request *GetTransactionsRequest, logger logging.Logger) (*GetTransactionsResponse, error) {
-		_, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
+		txList, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
 
 		if err != nil {
 			logger.Error("Could not get transactions. [error]: %v", err)
 			return nil, err
 		}
 
-		return nil, nil
+		response := GetTransactionsResponse{Payload: make([]Transaction, len(txList))}
+		for i, tx := range txList {
+			response.Payload[i] = V1TransactionFrom(tx)
+		}
+		return &response, nil
 	}
 }
 
@@ -67,32 +70,30 @@ func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Upd
 }
 
 func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, error) {
-	ctx := r.Context()
-
 	var req GetTransactionsRequest
 
-	// debID is required
-	debIDStr := chi.URLParamFromCtx(ctx, "debitor_id")
-	if debIDStr == "" {
-		return nil, errors.New("no Debitor ID was provided")
+	// debID is required (no, accounting will want to list all debitors for a certain period)
+	debIDStr := r.URL.Query().Get("debitor_id")
+	var debID int
+	var err error
+	if debIDStr != "" {
+		debID, err = strconv.Atoi(debIDStr)
+		if err != nil {
+			return nil, err
+		}
 	}
-	debID, err := strconv.Atoi(debIDStr)
-	if err != nil {
-		return nil, err
-	}
-
 	req.DebitorID = int64(debID)
 
-	req.TransactionIdentifier = chi.URLParamFromCtx(ctx, "transaction_identifier")
+	req.TransactionIdentifier = r.URL.Query().Get("transaction_identifier")
 
-	efFrom, err := parseEffectiveDate(chi.URLParamFromCtx(ctx, "effective_from"))
+	efFrom, err := parseEffectiveDate(r.URL.Query().Get("effective_from"))
 	if err != nil {
 		return nil, err
 	}
 
 	req.EffectiveFrom = efFrom
 
-	efBef, err := parseEffectiveDate(chi.URLParamFromCtx(ctx, "effective_before"))
+	efBef, err := parseEffectiveDate(r.URL.Query().Get("effective_before"))
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +105,7 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 
 func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.ResponseWriter) error {
 	if res == nil {
-		return common.ErrorFromMessage(common.TransactionDataInvalidMessage)
+		return common.ErrorFromMessage(common.TransactionReadErrorMessage)
 	}
 
 	err := json.NewEncoder(w).Encode(res)

@@ -445,6 +445,7 @@ components:
             - transaction.data.invalid (field data failed to validate, see details field for more information)
             - transaction.data.duplicate (duplicate referenceId)            
             - transaction.write.error (database error)
+            - transaction.read.error (database error)
             - transaction.paylink.error (adapter failure while creating payment link)            
             - transaction.id.notfound (no such transaction in the database)
             - transaction.id.invalid (syntactically invalid transaction id, must be positive integer)
@@ -469,7 +470,7 @@ components:
   securitySchemes:
     api_key:
       type: apiKey
-      name: X-API-TOKEN
+      name: X-Api-Key
       in: header
     bearer_auth:
       type: http

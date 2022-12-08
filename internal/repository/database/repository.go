@@ -21,5 +21,5 @@ type TransactionRepository interface {
 
 type TransactionLogRepository interface {
 	CreateTransactionLog(ctx context.Context, h entities.TransactionLog) error
-	GetTransactionLogByID(ctx context.Context, id int) (*entities.TransactionLog, error)
+	GetTransactionLogByID(ctx context.Context, id uint) (*entities.TransactionLog, error)
 }

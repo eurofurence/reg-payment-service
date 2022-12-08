@@ -2,6 +2,7 @@ package mysql
 
 import (
 	"fmt"
+	"gorm.io/gorm/schema"
 	"strings"
 	"sync"
 	"time"
@@ -27,7 +28,12 @@ func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (datab
 		return nil, err
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	gormConfig := gorm.Config{
+		NamingStrategy: schema.NamingStrategy{
+			TablePrefix: "pay_",
+		},
+	}
+	db, err := gorm.Open(mysql.Open(dsn), &gormConfig)
 	if err != nil {
 		return nil, err
 	}

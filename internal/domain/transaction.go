@@ -53,6 +53,22 @@ const (
 	Gift
 )
 
+var paymentMethodName = map[PaymentMethod]string{
+	Credit:   "Credit",
+	Paypal:   "Paypal",
+	Transfer: "Transfer",
+	Internal: "Internal",
+	Gift:     "Gift",
+}
+
+func (m PaymentMethod) Descriptor() string {
+	if pm, ok := paymentMethodName[m]; ok {
+		return pm
+	}
+
+	return ""
+}
+
 type TransactionStatus int
 
 const (
@@ -61,6 +77,21 @@ const (
 	Valid
 	Deleted
 )
+
+var transactionStatusName = map[TransactionStatus]string{
+	Pending:   "Pending",
+	Tentative: "Tentative",
+	Valid:     "Valid",
+	Deleted:   "Deleted",
+}
+
+func (t TransactionStatus) Descriptor() string {
+	if ts, ok := transactionStatusName[t]; ok {
+		return ts
+	}
+
+	return ""
+}
 
 type Deletion struct {
 	PreviousStatus TransactionStatus

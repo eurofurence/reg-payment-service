@@ -102,7 +102,10 @@ type UpdateTransactionRequest struct{}
 
 type UpdateTransactionResponse struct{}
 
+type AccountingDate string
+
 type Transaction struct {
+	// TODO missing ID for responses -> can't update
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
 	TransactionType       TransactionType             `json:"transaciont_type"`
@@ -112,8 +115,8 @@ type Transaction struct {
 	Status                TransactionStatus           `json:"status"`
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
-	EffectiveDate         time.Time                   `json:"effective_date"`
-	DueDate               time.Time                   `json:"due_date"`
+	EffectiveDate         AccountingDate              `json:"effective_date"`
+	DueDate               AccountingDate              `json:"due_date"`
 	CreationDate          time.Time                   `json:"creation_date"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }
