@@ -42,7 +42,7 @@ func CreateRouter(i interaction.Interactor, conf config.SecurityConfig) chi.Rout
 	router.Use(chimiddleware.Recoverer)
 	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.LogRequestIdMiddleware())
-	router.Use(middleware.CorsHeadersMiddleware())
+	router.Use(middleware.CorsHeadersMiddleware(&conf))
 
 	setupV1Routes(router, i, conf)
 
@@ -53,7 +53,6 @@ func setupV1Routes(router chi.Router, i interaction.Interactor, conf config.Secu
 	v1health.Create(router)
 
 	router.Route("/api/rest/v1", func(r chi.Router) {
-		r.Use(middleware.TokenHandlerMiddleware(conf.Fixed.Api))
 		v1transactions.Create(r, i)
 	})
 }

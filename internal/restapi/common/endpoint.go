@@ -28,20 +28,20 @@ func CreateHandler[Req, Res any](e Endpoint[Req, Res],
 
 		if requestHandler == nil {
 			logger.Error("No request handler supplied")
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger)
+			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
 			return
 		}
 
 		if responseHandler == nil {
 			logger.Error("No response handler supplied")
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger)
+			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
 			return
 		}
 
 		request, err := requestHandler(r)
 		if err != nil {
 			logger.Error("An error occurred while parsing the request. [error]: %v", err)
-			SendBadRequestResponse(w, reqID, logger)
+			SendBadRequestResponse(w, reqID, logger, "")
 			return
 		}
 
@@ -49,13 +49,13 @@ func CreateHandler[Req, Res any](e Endpoint[Req, Res],
 
 		if err != nil {
 			logger.Error("An error occurred during the request. [error]: %v", err)
-			SendInternalServerError(w, reqID, APIErrorMessage(err.Error()), logger)
+			SendInternalServerError(w, reqID, APIErrorMessage(err.Error()), logger, "")
 			return
 		}
 
 		if err := responseHandler(response, w); err != nil {
 			logger.Error("An error occurred during the handling of the response. [error]: %v", err)
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger)
+			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
 			return
 		}
 
