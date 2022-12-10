@@ -42,10 +42,19 @@ func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Cont
 func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	result := make([]entities.Transaction, 0)
 	for _, t := range m.transactions {
-		// TODO check all parameters
-		if t.DebitorID == query.DebitorID {
-			result = append(result, t)
+		if query.DebitorID != 0 && t.DebitorID != query.DebitorID {
+			continue
 		}
+		if query.TransactionIdentifier != "" && t.TransactionID != query.TransactionIdentifier {
+			continue
+		}
+		if !query.EffectiveFrom.IsZero() && query.EffectiveFrom.After(t.EffectiveDate.Time) || query.EffectiveFrom.Equal(t.EffectiveDate.Time) {
+			continue
+		}
+		if !query.EffectiveBefore.IsZero() && (query.EffectiveBefore.Before(t.EffectiveDate.Time)) {
+			continue
+		}
+		result = append(result, t)
 	}
 	return result, nil
 }
