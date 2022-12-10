@@ -22,7 +22,7 @@ func setupServer(t *testing.T) (string, func()) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.LogRequestIdMiddleware())
-	router.Use(middleware.CorsHeadersMiddleware())
+	router.Use(middleware.CorsHeadersMiddleware(nil))
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface
 		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(), logging.NewNoopLogger())

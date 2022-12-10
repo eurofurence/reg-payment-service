@@ -27,7 +27,7 @@ func createReqIdHandler(next http.Handler) func(w http.ResponseWriter, r *http.R
 			}
 		}
 		ctx := r.Context()
-		newCtx := context.WithValue(ctx, common.RequestIDKey, reqUuidStr)
+		newCtx := context.WithValue(ctx, common.CtxKeyRequestID{}, reqUuidStr)
 		r = r.WithContext(newCtx)
 
 		next.ServeHTTP(w, r)
