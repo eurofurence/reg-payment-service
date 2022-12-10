@@ -1,29 +1,26 @@
 package v1transactions
 
 import (
-	"time"
-
-	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-func V1TransactionFrom(dom domain.Transaction) Transaction {
+func ToV1Transaction(tran entities.Transaction) Transaction {
 	return Transaction{
-		DebitorID:             dom.DebitorID,
-		TransactionIdentifier: dom.ID,
-		TransactionType:       dom.Type,
-		Method:                dom.Method,
+		DebitorID:             tran.DebitorID,
+		TransactionIdentifier: tran.TransactionID,
+		TransactionType:       tran.TransactionType,
+		Method:                tran.PaymentMethod,
 		Amount: Amount{
-			Currency:  dom.Amount.Currency,
-			GrossCent: dom.Amount.GrossCent,
-			VatRate:   dom.Amount.VatRate,
+			Currency:  tran.Amount.ISOCurrency,
+			GrossCent: tran.Amount.GrossCent,
+			VatRate:   tran.Amount.VatRate,
 		},
-		Comment:         dom.Comment,
-		Status:          dom.Status,
+		Comment:         tran.Comment,
+		Status:          tran.TransactionStatus,
 		Info:            make(map[string]interface{}), // TODO (no field)
-		PaymentStartUrl: "",                           // TODO (no field)
-		EffectiveDate:   "2022-12-08",                 // TODO convert to iso date (or we get timezone dependence after all)
-		DueDate:         "2022-12-20",                 // TODO convert to iso date (or we get timezone dependence after all)
-		CreationDate:    time.Now(),                   // TODO (no field)
-		StatusHistory:   make([]StatusHistory, 0),     // TODO
+		PaymentStartUrl: tran.PayLinkURL,
+		EffectiveDate:   tran.EffectiveDate.Time.Format("2006-01-02"),
+		DueDate:         tran.DueDate.Time.Format("2006-01-02"),
+		CreationDate:    tran.CreatedAt,
 	}
 }

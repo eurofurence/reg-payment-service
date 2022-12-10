@@ -416,8 +416,6 @@ components:
           type: string
           format: date-time
           example: '2022-06-24T11:12:13Z'
-        status_history:
-          $ref: '#/components/schemas/StatusHistory'
     TransactionInitiator:
       type: object
       required:
@@ -454,26 +452,6 @@ components:
           format: double
           description: VAT rate in percent. The example value means 7.7% VAT.
           example: 7.7
-    StatusHistory:
-      description: the history of status changes for this transaction. Only visible to admins.
-      type: array
-      items:
-        type: object
-        required:
-          - status
-          - change_date
-        properties:
-          status:
-            $ref: '#/components/schemas/TransactionStatus'
-          comment:
-            type: string
-            description: optional comment why the change was made
-          changed_by:
-            type: string
-            description: the subject from the JWT (that is, the user id from the identity provider)
-          change_date:
-            type: string
-            format: date-time
     TransactionStatus:
       type: string
       example: valid

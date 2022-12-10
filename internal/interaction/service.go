@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 )
@@ -12,8 +12,8 @@ import (
 var _ Interactor = (*serviceInteractor)(nil)
 
 type Interactor interface {
-	GetTransactionsForDebitor(ctx context.Context, debitorID int64) ([]domain.Transaction, error)
-	CreateTransaction(ctx context.Context, tran *domain.Transaction) error
+	GetTransactionsForDebitor(ctx context.Context, debitorID int64) ([]entities.Transaction, error)
+	CreateTransaction(ctx context.Context, tran *entities.Transaction) error
 }
 
 type serviceInteractor struct {

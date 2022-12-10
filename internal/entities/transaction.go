@@ -65,12 +65,13 @@ type Transaction struct {
 	TransactionID     string            `gorm:"index;type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
 	TransactionType   TransactionType   `gorm:"type:enum('due', 'payment')"`
 	PaymentMethod     PaymentMethod     `gorm:"type:enum('credit', 'paypal', 'transfer', 'internal', 'gift')"`
+	PayLinkURL        string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;default:NULL"`
 	TransactionStatus TransactionStatus `gorm:"type:enum('tentative', 'pending', 'valid', 'deleted')"`
 	Amount            Amount            `gorm:"embedded"`
 	Comment           string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"`
 	Deletion          Deletion          `gorm:"embedded;embeddedPrefix:deleted_"`
-	EffectiveDate     sql.NullTime
-	DueDate           sql.NullTime
+	EffectiveDate     sql.NullTime      `gorm:"type:date;NOT NULL"`
+	DueDate           sql.NullTime      `gorm:"type:date;default:NULL"`
 }
 
 type Amount struct {
@@ -80,7 +81,7 @@ type Amount struct {
 }
 
 type Deletion struct {
-	Status  TransactionStatus `gorm:"type:enum('tentative', 'pending', 'valid', 'deleted')"`
+	Status  TransactionStatus `gorm:"type:enum('tentative', 'pending', 'valid', 'deleted');NULL;default:NULL"`
 	Comment string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"`
 	By      string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"`
 }

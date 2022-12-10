@@ -53,7 +53,7 @@ func TestCreateHandler(t *testing.T) {
 			endpoint: func(ctx context.Context, request *testRequest, logger logging.Logger) (*testResponse, error) {
 				return tRes, nil
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				return nil
 			},
@@ -83,7 +83,7 @@ func TestCreateHandler(t *testing.T) {
 				tReq.Counter++
 				return tReq, nil
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				return nil
 			},
@@ -100,7 +100,7 @@ func TestCreateHandler(t *testing.T) {
 				tReq.Counter++
 				return nil, errors.New("error error error")
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				return nil
 			},
@@ -117,7 +117,7 @@ func TestCreateHandler(t *testing.T) {
 				tReq.Counter++
 				return tReq, nil
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				return nil
 			},
@@ -134,7 +134,7 @@ func TestCreateHandler(t *testing.T) {
 				tReq.Counter++
 				return tReq, nil
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				return errors.New("Error sending response")
 			},
@@ -151,7 +151,7 @@ func TestCreateHandler(t *testing.T) {
 				tReq.Counter++
 				return tReq, nil
 			},
-			respHandler: func(res *testResponse, w http.ResponseWriter) error {
+			respHandler: func(ctx context.Context, res *testResponse, w http.ResponseWriter) error {
 				res.Counter++
 				require.NoError(t, json.NewEncoder(w).Encode(res))
 				return errors.New("Error sending response")

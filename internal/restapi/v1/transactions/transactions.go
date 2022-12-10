@@ -49,7 +49,7 @@ func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTr
 
 		response := GetTransactionsResponse{Payload: make([]Transaction, len(txList))}
 		for i, tx := range txList {
-			response.Payload[i] = V1TransactionFrom(tx)
+			response.Payload[i] = ToV1Transaction(tx)
 		}
 		return &response, nil
 	}
@@ -103,9 +103,16 @@ func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, er
 	return &req, nil
 }
 
-func getTransactionsResponseHandler(res *GetTransactionsResponse, w http.ResponseWriter) error {
+func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsResponse, w http.ResponseWriter) error {
 	if res == nil {
 		return common.ErrorFromMessage(common.TransactionReadErrorMessage)
+	}
+
+	if len(res.Payload) == 0 {
+		reqID := common.GetRequestID(ctx)
+		logger := logging.WithRequestID(ctx, reqID)
+		common.SendStatusNotFoundResponse(w, reqID, logger, "")
+		return nil
 	}
 
 	err := json.NewEncoder(w).Encode(res)
@@ -132,7 +139,7 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 	return &request, nil
 }
 
-func createTransactionResponseHandler(res *CreateTransactionResponse, w http.ResponseWriter) error {
+func createTransactionResponseHandler(ctx context.Context, res *CreateTransactionResponse, w http.ResponseWriter) error {
 
 	return nil
 }
@@ -141,7 +148,7 @@ func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest
 	return nil, nil
 }
 
-func updateTransactionResponseHandler(res *UpdateTransactionResponse, w http.ResponseWriter) error {
+func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactionResponse, w http.ResponseWriter) error {
 	return nil
 }
 

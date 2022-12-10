@@ -3,7 +3,6 @@ package v1transactions
 import (
 	"time"
 
-	"github.com/eurofurence/reg-payment-service/internal/domain"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
@@ -65,8 +64,8 @@ type Transaction struct {
 	Status                entities.TransactionStatus  `json:"status"`
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
-	EffectiveDate         domain.AccountingDate       `json:"effective_date"`
-	DueDate               domain.AccountingDate       `json:"due_date"`
+	EffectiveDate         string                      `json:"effective_date"`
+	DueDate               string                      `json:"due_date"`
 	CreationDate          time.Time                   `json:"creation_date"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }

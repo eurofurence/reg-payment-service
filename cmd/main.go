@@ -184,9 +184,11 @@ func testUpdateTransaction(ctx context.Context, r database.Repository, tr entiti
 }
 
 func defaultTransaction() entities.Transaction {
+	ti, _ := time.Parse("2006-01-02", "2022-12-30")
+
 	return entities.Transaction{
-		TransactionID:     "123456789",
-		DebitorID:         1,
+		TransactionID:     "234567891",
+		DebitorID:         2,
 		TransactionType:   entities.TransactionTypeDue,
 		PaymentMethod:     entities.PaymentMethodCredit,
 		TransactionStatus: entities.TransactionStatusPending,
@@ -195,8 +197,11 @@ func defaultTransaction() entities.Transaction {
 			GrossCent:   19000,
 			VatRate:     19.0,
 		},
-		Comment:       "Payment Noroth",
-		EffectiveDate: sql.NullTime{},
-		DueDate:       sql.NullTime{},
+		Comment: "Payment Noroth",
+		EffectiveDate: sql.NullTime{
+			Valid: true,
+			Time:  ti,
+		},
+		DueDate: sql.NullTime{},
 	}
 }

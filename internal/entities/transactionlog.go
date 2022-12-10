@@ -16,8 +16,8 @@ type TransactionLog struct {
 	Transaction `gorm:"embedded"`
 }
 
-// TableName implements the Tabler interface to change from a pluarlized table name to
-// the singular name.
-func (TransactionLog) TableName() string {
-	return "transaction_log"
-}
+// // TableName implements the Tabler interface to change from a pluarlized table name to
+// // the singular name.
+// func (TransactionLog) TableName() string {
+// 	return "transaction_log"
+// }
