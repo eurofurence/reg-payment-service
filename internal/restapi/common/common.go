@@ -13,7 +13,7 @@ import (
 type (
 	CtxKeyRequestID struct{}
 	CtxKeyToken     struct{}
-	CtxKeyAPIToken  struct{}
+	CtxKeyAPIKey    struct{}
 	CtxKeyClaims    struct{}
 )
 

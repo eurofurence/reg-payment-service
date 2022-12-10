@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/go-http-utils/headers"
 	"github.com/golang-jwt/jwt/v4"
@@ -33,7 +34,8 @@ mwIDAQAB
 `
 
 const valid_JWT_is_admin_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbImFkbWluIl19LCJpYXQiOjE1MTYyMzkwMjJ9.L8CNx5rE9TQSdd1II7UythBlo5o2lhIYvXG6eDGrkMNYBWEcYBShgTCJvOMrxXIOF16H6HVlBYLNBBGesCgsao3ffXsJZkDJML_9mC31mdtqVS5-L0Ka7xuZTc7OXyCWqVmNLG0IthY3Pa8QfOol5OOrynJVNF6tbAHVZ_Kxn5u2edMT1Cn2ngPTV5OXqHArhNvb8PbcxyV5U4VOwSAHy6pxBjxaV_IQrLkPi2f1aV4Mr9tYqXf8yEFNi70WH_pI0mXMWIbwWmBP9ESJAvrQIiSdfIURIk2u5-HcNiHMBCy4CrnCz3_xJjI6GVyJYNZNjtppGWx7QHmDNIhZuzCIAg`
-const valid_JWT_is_admin_256_no_claims = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.ajUvZZVkUQIsqLn_nEj-py1n6HWek7KCuyFlYMEe5D37XHI7Ydujcs4MAGKNVI7vCY_oyQHtL32lxKDinTiT-wgWLxwJtSXCxfu6aOTFnpC4JOGTFGhjzWjOSB4djW2fKthkS0xR_0NEOWMF3RjqMsneiZDKRobZhkH3VLnNgUhAM1Msy6laPvxwUf-qeqH0LZOhRJ21_TstII7xDKpilkwiBCoHFoQTlNECHqCiC8B69fCVlUo6Ri--a5WhV6p_t4SKEtP2bVRXjyIA8e6tG0qsL9ki6UaT4AejK7UvA4dIRwu2dRVFPJGDegcbB0OSVSPbTSJI_-ygi-Z6Cj03fg`
+const valid_JWT_256_no_claims = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.ajUvZZVkUQIsqLn_nEj-py1n6HWek7KCuyFlYMEe5D37XHI7Ydujcs4MAGKNVI7vCY_oyQHtL32lxKDinTiT-wgWLxwJtSXCxfu6aOTFnpC4JOGTFGhjzWjOSB4djW2fKthkS0xR_0NEOWMF3RjqMsneiZDKRobZhkH3VLnNgUhAM1Msy6laPvxwUf-qeqH0LZOhRJ21_TstII7xDKpilkwiBCoHFoQTlNECHqCiC8B69fCVlUo6Ri--a5WhV6p_t4SKEtP2bVRXjyIA8e6tG0qsL9ki6UaT4AejK7UvA4dIRwu2dRVFPJGDegcbB0OSVSPbTSJI_-ygi-Z6Cj03fg`
+const valid_JWT_256_multiple_claims = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbImFkbWluIiwic3RhZmYiLCJnb2giLCJwcmVzcyJdfSwiaWF0IjoxNTE2MjM5MDIyfQ.CBNNQZ395IE7BGWD3BlIt2G5abeY8tMkn_8qP5_HeIIoe0nHLdJzxE58iKxh4kkLKbDefgHzu1NlBMUuO5T5o6XxauwwPyt2xcR77A7Wc3y24IuOd-Ri2wraq-6hOcbFWiPjEVtZ5ppOG2FNR_iTgDHYpVSP5MY8uEmvSzLRGSihRu_jfNARgHXpqXtQ5QNa0bKLT_HmIvvLpXIuc9nj312N3zQ6jzJRbLqMvQRr_OJXqq495pc5KsAvbTBmOixBHhm43K9BR4pRJsSccVRfodNqBuUyXKlvR4L8SclygTWQ77bBfeLYJdxmfi6NyHa1-lMWk26vwQ6eZk4FCcKy5A`
 const invalid_JWT_is_admin_no_subject_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJnbG9iYWwiOnsibmFtZSI6IkpvaG4gRG9lIiwicm9sZXMiOlsiYWRtaW4iXX0sImlhdCI6MTUxNjIzOTAyMn0.qNvWt_hp357DUZMCZLXOzWwpC0eeYReipcXQhkIzKkBO6m0xgO3MmOU4GEZFnA69d9Hi-0b0FhnwrenhIKNLjixwQ4zaO5BicptoPw-giQLQkutAcBglmi6v55dGGqS0zikE8w2tgK5HfLPmvNm2ZEj_FPipSyeK9O1JJw2F_cHEBmrRONp69Qdybfk1gsrTwQx7hZSHOv8q0F58dr4tctbySQerdlvInbYPMIgOqQ8PCj5t5bHA4-dwHOSxz8gqG3oTBZ50o8RbLqh7tsatqRVo64wTI86g4evKxRnsBlpcy4BLID6lQ-_2d7w5bFBNw9ZW-4dA-CNc347hKw59cQ`
 
 const valid_JWT_is_non_staff_subject_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbXX0sImlhdCI6MTUxNjIzOTAyMn0.phzC1-ExNKJyYoh2MD-3N0Kd6gUjPUXuOplf6bvkb2qyhDDcVJFQtx9lcLLz03KhYBZf2LFp8tLu0Ezu9KacJXNSKmN2Vl_EMbbsxmDCe0JnDZ-UZQXlE6Z43dQPmKVXSKzYMSNPPEN0UsSxS_DYzHkYG2kUwjeI51y_zQ5Yis6M5XO4erh6ji6Lf_XYZseR-MG6PxkO4AdtOSijSj_12z_17QiuYImqljrAp2pmvALhyQzgCIRRyCeBY_T2NQVr7SkTR8ljAB9nv0b1DlZHE-N3qBrPHXjY83VZ4avabeugBOWxLSlfZwz7YqQdYNQVlXfW57aT1OCs0HQEmdtkqg`
@@ -48,6 +50,8 @@ kd3qqGElvW/VDL5AaWTg0nLVkjRo9z+40RQzuVaE8AkAFmxZzow3x+VJYKdjykkJ
 cKWTjpBP2dPwVZ4WWC+9aGVd+Gyn1o0CLelf4rEjGoXbAAEgAqeGUxrcIlbjXfbc
 mwIDAQAB
 -----END PUBLIC KEY-----`
+
+const invalid_JWT_created_by_foreign_IDP = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbImFkbWluIl19LCJpYXQiOjE1MTYyMzkwMjJ9.deOtnPQYyWZH4I9auZ7_UYRvw8jqsv3_1vMfCrxzrB0wvNYQFvYyU24kAb0__5TsYuW_exTs6BJ9JRVR0S98dzTHf6RbU-3wRJWP2JnILgvjXo4fjd3AuZ2dO_zxcL8EQrvnwvPKnDUrdaF67GYewKTedIfHfLltdP8wbsUl0fPiOmFMJKuDq3OQ1tDLKjfb3KHKkIcL9JQPsfYwE-d2n6YBCkh74KqY8iz831XxZhwiYTSU8n_TrRV4_UJ2ID-RQz6szEjzu21AcCXYX80zXFb4uXudiZOdu0Jc0gDW45NiU0HmHI2MR3E3kuPs5t7mpUeFgxh8hsbbRD3PC-fUdg`
 
 func TestParseAuthCookie(t *testing.T) {
 	tests := []struct {
@@ -235,6 +239,7 @@ func TestCheckRequestAuthorization_ParsePEMs(t *testing.T) {
 
 type statusCodeResponseWriter struct {
 	statusCode int
+	called     bool
 }
 
 func (s *statusCodeResponseWriter) Header() http.Header {
@@ -246,17 +251,18 @@ func (s *statusCodeResponseWriter) Write(b []byte) (int, error) {
 }
 
 func (s *statusCodeResponseWriter) WriteHeader(statusCode int) {
+	s.called = true
 	s.statusCode = statusCode
 }
 
 func TestCheckRequestAuthorization(t *testing.T) {
 	type args struct {
-		xAPITokenHeader     string
+		xAPIKeyHeader       string
 		authorizationHeader string
 	}
 
 	type expected struct {
-		xAPIToken  string
+		xAPIKey    string
 		jwt        string
 		claims     *common.AllClaims
 		shouldFail bool
@@ -270,11 +276,11 @@ func TestCheckRequestAuthorization(t *testing.T) {
 		{
 			name: "Should successfully retrieve API token from header",
 			args: args{
-				xAPITokenHeader:     "test-shared-secret",
+				xAPIKeyHeader:       "test-shared-secret",
 				authorizationHeader: "",
 			},
 			expected: expected{
-				xAPIToken:  "test-shared-secret",
+				xAPIKey:    "test-shared-secret",
 				jwt:        "",
 				claims:     nil,
 				shouldFail: false,
@@ -282,27 +288,173 @@ func TestCheckRequestAuthorization(t *testing.T) {
 		},
 		{
 			name: "Should not proceed when API token doesn't match the configured value",
+			args: args{
+				xAPIKeyHeader:       "invalid-shared-secret",
+				authorizationHeader: "",
+			},
+			expected: expected{
+				xAPIKey:    "test-shared-secret",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
 		},
 		{
-			name: "Should not proceed when both authorization header and cookie are missing",
+			name: "Should not proceed when both authorization header and API token are missing",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "",
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
 		},
 		{
 			name: "Should fail validation when authorization header doesn't contain `Bearer ` prefix",
+			args: args{
+				xAPIKeyHeader: "",
+				// valid JWT, but without the "Bearer " prefix
+				authorizationHeader: valid_JWT_is_not_staff,
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
 		},
 		{
 			name: "Should fail validation when only `Bearer ` exists without token",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer ",
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
 		},
 		{
 			name: "Should fail validation when token contains blanks",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + valid_JWT_is_not_staff + " Additional Data",
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
 		},
 		{
 			name: "Should successfully parse JWT token against configured PEM RS256",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + valid_JWT_is_admin_256,
+			},
+			expected: expected{
+				xAPIKey: "",
+				jwt:     valid_JWT_is_admin_256,
+				claims: &common.AllClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						Subject: "1234567890",
+						IssuedAt: &jwt.NumericDate{
+							Time: time.Unix(1516239022, 0),
+						},
+					},
+					CustomClaims: common.CustomClaims{
+						Global: common.GlobalClaims{
+							Name:  "John Doe",
+							Roles: []string{"admin"},
+						},
+					},
+				},
+				shouldFail: false,
+			},
 		},
 		{
-			name: "Should succeeed when no token claims are present",
+			name: "Should succeed when no token claims are present",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + valid_JWT_256_no_claims,
+			},
+			expected: expected{
+				xAPIKey: "",
+				jwt:     valid_JWT_256_no_claims,
+				claims: &common.AllClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						Subject: "1234567890",
+						IssuedAt: &jwt.NumericDate{
+							Time: time.Unix(1516239022, 0),
+						},
+					},
+					CustomClaims: common.CustomClaims{
+						Global: common.GlobalClaims{
+							Name:  "",
+							Roles: nil,
+						},
+					},
+				},
+				shouldFail: false,
+			},
 		},
 		{
 			name: "Should fail when no subject was provided in the token",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + invalid_JWT_is_admin_no_subject_256,
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
+		},
+		{
+			name: "Should fail when the JWT is signed with an unknown key",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + invalid_JWT_created_by_foreign_IDP,
+			},
+			expected: expected{
+				xAPIKey:    "",
+				jwt:        "",
+				claims:     nil,
+				shouldFail: true,
+			},
+		},
+		{
+			name: "Should proceed with valid JWT containing multiple roles",
+			args: args{
+				xAPIKeyHeader:       "",
+				authorizationHeader: "Bearer " + valid_JWT_256_multiple_claims,
+			},
+			expected: expected{
+				xAPIKey: "",
+				jwt:     valid_JWT_256_multiple_claims,
+				claims: &common.AllClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						Subject: "1234567890",
+						IssuedAt: &jwt.NumericDate{
+							Time: time.Unix(1516239022, 0),
+						},
+					},
+					CustomClaims: common.CustomClaims{
+						Global: common.GlobalClaims{
+							Name:  "John Doe",
+							Roles: []string{"admin", "staff", "goh", "press"},
+						},
+					},
+				},
+				shouldFail: false,
+			},
 		},
 	}
 
@@ -322,20 +474,47 @@ func TestCheckRequestAuthorization(t *testing.T) {
 			r, err := http.NewRequest("GET", "/", nil)
 			require.NoError(t, err)
 
-			if tt.args.xAPITokenHeader != "" {
-				r.Header.Add(apiKeyHeader, tt.args.xAPITokenHeader)
+			if tt.args.xAPIKeyHeader != "" {
+				r.Header.Add(apiKeyHeader, tt.args.xAPIKeyHeader)
 			}
 			if tt.args.authorizationHeader != "" {
 				r.Header.Add(headers.Authorization, tt.args.authorizationHeader)
 			}
 
 			next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if tt.expected.xAPIToken != "" {
-					value, ok := r.Context().Value(common.CtxKeyAPIToken{}).(string)
+
+				wrappedWriter, ok := w.(*statusCodeResponseWriter)
+				if !ok {
+					require.FailNow(t, "expected statusCodeResponseWriter")
+				}
+
+				if tt.expected.xAPIKey != "" {
+					value, ok := r.Context().Value(common.CtxKeyAPIKey{}).(string)
 					if !ok {
 						require.FailNow(t, "expected type string")
 					}
-					require.Equal(t, tt.expected.xAPIToken, value)
+					require.Equal(t, tt.expected.xAPIKey, value)
+				}
+
+				if tt.expected.jwt != "" {
+					value, ok := r.Context().Value(common.CtxKeyToken{}).(string)
+					if !ok {
+						require.FailNow(t, "expected type string")
+					}
+					require.Equal(t, tt.expected.jwt, value)
+				}
+
+				if tt.expected.claims != nil {
+					require.Equal(t, tt.expected.claims, r.Context().Value(common.CtxKeyClaims{}))
+				}
+
+				if tt.expected.shouldFail {
+					// anything greater or equal to 300 is a failed request
+					require.True(t, wrappedWriter.called)
+					require.GreaterOrEqual(t, wrappedWriter.statusCode, http.StatusMultipleChoices)
+				} else {
+					// in the success paths, our middleware never calls the responseWriter
+					require.False(t, wrappedWriter.called)
 				}
 			})
 

@@ -15,7 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-const apiKeyHeader = "X-Api-Token"
+const apiKeyHeader = "X-Api-Key"
 const bearerPrefix = "Bearer"
 
 func parseAuthCookie(r *http.Request, cookieName string) string {
@@ -40,7 +40,7 @@ func parseBearerToken(r *http.Request, conf *config.SecurityConfig) string {
 	return parseAuthCookie(r, conf.Oidc.TokenCookieName)
 }
 
-func getApiTokenFromHeader(r *http.Request) string {
+func getApiKeyFromHeader(r *http.Request) string {
 	return r.Header.Get(apiKeyHeader)
 }
 
@@ -72,10 +72,10 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 			reqID := common.GetRequestID(ctx)
 			logger := logging.WithRequestID(ctx, reqID)
 
-			// check for api token first
-			if token := getApiTokenFromHeader(r); token != "" {
+			// check for api key first
+			if token := getApiKeyFromHeader(r); token != "" {
 				if token == conf.Fixed.Api {
-					ctx = context.WithValue(ctx, common.CtxKeyAPIToken{}, token)
+					ctx = context.WithValue(ctx, common.CtxKeyAPIKey{}, token)
 					r = r.WithContext(ctx)
 					next.ServeHTTP(w, r)
 				} else {
@@ -108,7 +108,7 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 
 			for _, key := range parsedPEMs {
 				claims := common.AllClaims{}
-				token, err := jwt.ParseWithClaims(tokenString, &common.AllClaims{}, keyFuncForKey(key), jwt.WithValidMethods([]string{"RS256", "RS512"}))
+				token, err := jwt.ParseWithClaims(tokenString, &claims, keyFuncForKey(key), jwt.WithValidMethods([]string{"RS256", "RS512"}))
 				if err != nil {
 					logger.Debug("Couldn't parse token, [reason]: %s", err.Error())
 					continue
