@@ -43,6 +43,7 @@ func CreateRouter(i interaction.Interactor, conf config.SecurityConfig) chi.Rout
 	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.LogRequestIdMiddleware())
 	router.Use(middleware.CorsHeadersMiddleware(&conf))
+	router.Use(middleware.CheckRequestAuthorization(&conf))
 
 	setupV1Routes(router, i, conf)
 
