@@ -1,23 +1,24 @@
 package v1transactions
 
 import (
-	"github.com/eurofurence/reg-payment-service/internal/domain"
 	"time"
+
+	"github.com/eurofurence/reg-payment-service/internal/domain"
 )
 
 func V1TransactionFrom(dom domain.Transaction) Transaction {
 	return Transaction{
 		DebitorID:             dom.DebitorID,
 		TransactionIdentifier: dom.ID,
-		TransactionType:       TransactionType(dom.Type.Descriptor()),
-		Method:                PaymentMethod(dom.Method.Descriptor()),
+		TransactionType:       dom.Type,
+		Method:                dom.Method,
 		Amount: Amount{
 			Currency:  dom.Amount.Currency,
 			GrossCent: dom.Amount.GrossCent,
 			VatRate:   dom.Amount.VatRate,
 		},
 		Comment:         dom.Comment,
-		Status:          TransactionStatus(dom.Status.Descriptor()),
+		Status:          dom.Status,
 		Info:            make(map[string]interface{}), // TODO (no field)
 		PaymentStartUrl: "",                           // TODO (no field)
 		EffectiveDate:   "2022-12-08",                 // TODO convert to iso date (or we get timezone dependence after all)

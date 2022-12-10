@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
 func (m *inmemoryProvider) CreateTransaction(ctx context.Context, tr entities.Transaction) error {
@@ -29,9 +29,9 @@ func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Tr
 	return nil
 }
 
-func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Context, transactionID string, tType uint) (*entities.Transaction, error) {
+func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Context, transactionID string, tType entities.TransactionType) (*entities.Transaction, error) {
 	for _, t := range m.transactions {
-		if t.TransactionID == transactionID && t.TransactionTypeID == tType {
+		if t.TransactionID == transactionID && t.TransactionType == tType {
 			copy := t
 			return &copy, nil
 		}

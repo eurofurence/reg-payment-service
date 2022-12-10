@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sync/atomic"
 
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
 func (m *inmemoryProvider) CreateTransactionLog(ctx context.Context, tl entities.TransactionLog) error {

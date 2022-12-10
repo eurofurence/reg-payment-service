@@ -4,17 +4,17 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
-	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"net/http"
 	"path/filepath"
 
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
-	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/mysql"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 	"github.com/eurofurence/reg-payment-service/internal/server"
 
 	"context"
@@ -164,7 +164,7 @@ func playDatabase(ctx context.Context, r database.Repository) {
 		dt := defaultTransaction()
 
 		dt.Comment = "Hello1"
-		dt.TransactionStatusID = uint(domain.Valid)
+		dt.TransactionStatus = entities.TransactionStatusValid
 		dt.DebitorID = 1
 		err = testUpdateTransaction(ctx, r, dt)
 		if err != nil {
@@ -187,18 +187,9 @@ func defaultTransaction() entities.Transaction {
 	return entities.Transaction{
 		TransactionID:     "123456789",
 		DebitorID:         1,
-		TransactionTypeID: uint(domain.Due),
-		TransactionType: entities.TransactionType{
-			Description: "Due",
-		},
-		PaymentMethodID: uint(domain.Credit),
-		PaymentMethod: entities.PaymentMethod{
-			Description: "Credit",
-		},
-		TransactionStatusID: uint(domain.Pending),
-		TransactionStatus: entities.TransactionStatus{
-			Description: "Pending",
-		},
+		TransactionType:   entities.TransactionTypeDue,
+		PaymentMethod:     entities.PaymentMethodCredit,
+		TransactionStatus: entities.TransactionStatusPending,
 		Amount: entities.Amount{
 			ISOCurrency: "EUR",
 			GrossCent:   19000,

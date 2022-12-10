@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/eurofurence/reg-payment-service/internal/domain"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, debitorID int64) ([]domain.Transaction, error) {
@@ -34,15 +34,15 @@ func toDomainTransaction(tr entities.Transaction) domain.Transaction {
 	dtr := domain.Transaction{
 		ID:        tr.TransactionID,
 		DebitorID: tr.DebitorID,
-		Type:      domain.TransactionType(tr.TransactionTypeID),
-		Method:    domain.PaymentMethod(tr.PaymentMethodID),
+		Type:      entities.TransactionType(tr.TransactionType),
+		Method:    entities.PaymentMethod(tr.PaymentMethod),
 		Amount: domain.Amount{
 			Currency:  tr.Amount.ISOCurrency,
 			GrossCent: tr.Amount.GrossCent,
 			VatRate:   tr.Amount.VatRate,
 		},
 		Comment: tr.Comment,
-		Status:  domain.TransactionStatus(tr.TransactionStatusID),
+		Status:  entities.TransactionStatus(tr.TransactionStatus),
 	}
 
 	if tr.EffectiveDate.Valid {
@@ -55,7 +55,7 @@ func toDomainTransaction(tr entities.Transaction) domain.Transaction {
 
 	if tr.DeletedAt.Valid {
 		dtr.Deletion = &domain.Deletion{
-			PreviousStatus: domain.TransactionStatus(tr.Deletion.TransactionStatusID),
+			PreviousStatus: entities.TransactionStatus(tr.Deletion.Status),
 			Comment:        tr.Deletion.Comment,
 			DeletedBy:      tr.Deletion.By,
 			Date:           tr.DeletedAt.Time,

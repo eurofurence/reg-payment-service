@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
 func (m *mysqlConnector) CreateTransactionLog(ctx context.Context, tl entities.TransactionLog) error {

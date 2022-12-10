@@ -1,8 +1,10 @@
 package v1transactions
 
 import (
-	"github.com/eurofurence/reg-payment-service/internal/domain"
 	"time"
+
+	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
 // GetTransactionsRequest will contain all information that will be sent from the
@@ -34,10 +36,10 @@ type Amount struct {
 type PaymentProcessorInformation map[string]interface{}
 
 type StatusHistory struct {
-	Status     domain.TransactionStatus `json:"status"`
-	Comment    string                   `json:"comment"`
-	ChangedBy  string                   `json:"changed_by"`
-	ChangeDate time.Time                `json:"change_date"`
+	Status     entities.TransactionStatus `json:"status"`
+	Comment    string                     `json:"comment"`
+	ChangedBy  string                     `json:"changed_by"`
+	ChangeDate time.Time                  `json:"change_date"`
 }
 
 // CreateTrasactionRequest contains all information to create a new transaction for a given debitor
@@ -56,11 +58,11 @@ type Transaction struct {
 	// TODO missing ID for responses -> can't update
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
-	TransactionType       domain.TransactionType      `json:"transaciont_type"`
-	Method                domain.PaymentMethod        `json:"method"`
+	TransactionType       entities.TransactionType    `json:"transaciont_type"`
+	Method                entities.PaymentMethod      `json:"method"`
 	Amount                Amount                      `json:"amount"`
 	Comment               string                      `json:"comment"`
-	Status                domain.TransactionStatus    `json:"status"`
+	Status                entities.TransactionStatus  `json:"status"`
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
 	EffectiveDate         domain.AccountingDate       `json:"effective_date"`

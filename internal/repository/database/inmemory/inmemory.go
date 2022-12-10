@@ -1,8 +1,8 @@
 package inmemory
 
 import (
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 )
 
 var _ database.Repository = (*inmemoryProvider)(nil)
