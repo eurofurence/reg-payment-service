@@ -58,7 +58,7 @@ func main() {
 		logger.Fatal("%v", err)
 	}
 
-	playDatabase(ctx, repo)
+	//playDatabase(ctx, repo)
 
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
 		return interaction.NewServiceInteractor(repo, logger)
@@ -187,7 +187,7 @@ func defaultTransaction() entities.Transaction {
 	ti, _ := time.Parse("2006-01-02", "2022-12-30")
 
 	return entities.Transaction{
-		TransactionID:     "234567891",
+		TransactionID:     "234567895",
 		DebitorID:         2,
 		TransactionType:   entities.TransactionTypeDue,
 		PaymentMethod:     entities.PaymentMethodCredit,

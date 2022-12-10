@@ -86,15 +86,27 @@ func (m *mysqlConnector) GetTransactionByTransactionIDAndType(ctx context.Contex
 	return &tr, nil
 }
 
-func (m *mysqlConnector) GetTransactionsByFilter(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+func (m *mysqlConnector) GetTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	var transactions []entities.Transaction
 
 	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
-	res := m.db.WithContext(tCtx).
-		Where(&entities.Transaction{DebitorID: debitorID}).
-		Find(&transactions)
+	db := m.db.WithContext(tCtx).
+		Where(&entities.Transaction{
+			DebitorID:     query.DebitorID,
+			TransactionID: query.TransactionIdentifier,
+		})
+
+	if !query.EffectiveFrom.IsZero() {
+		db.Where("effective_date >= ?", query.EffectiveFrom)
+	}
+
+	if !query.EffectiveBefore.IsZero() {
+		db.Where("effective_date < ?", query.EffectiveBefore)
+	}
+
+	res := db.Find(&transactions)
 	if res.Error != nil {
 		return nil, res.Error
 	}

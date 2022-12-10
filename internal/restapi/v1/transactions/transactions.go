@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
@@ -36,11 +37,23 @@ func Create(router chi.Router, i interaction.Interactor) {
 			updateTransactionRequestHandler,
 			updateTransactionResponseHandler),
 	)
+
+	router.Post("/transactions/initiate-payment",
+		common.CreateHandler(
+			MakeInitiatePaymentEndpoint(i),
+			initiatePaymentRequestHandler,
+			initiatePaymentResponseHandler,
+		))
 }
 
 func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTransactionsRequest, GetTransactionsResponse] {
 	return func(ctx context.Context, request *GetTransactionsRequest, logger logging.Logger) (*GetTransactionsResponse, error) {
-		txList, err := i.GetTransactionsForDebitor(ctx, request.DebitorID)
+		txList, err := i.GetTransactionsForDebitor(ctx, entities.TransactionQuery{
+			DebitorID:             request.DebitorID,
+			TransactionIdentifier: request.TransactionIdentifier,
+			EffectiveFrom:         request.EffectiveFrom,
+			EffectiveBefore:       request.EffectiveBefore,
+		})
 
 		if err != nil {
 			logger.Error("Could not get transactions. [error]: %v", err)
@@ -65,6 +78,13 @@ func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Cre
 func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[UpdateTransactionRequest, UpdateTransactionResponse] {
 	return func(ctx context.Context, request *UpdateTransactionRequest, logger logging.Logger) (*UpdateTransactionResponse, error) {
 
+		return nil, nil
+	}
+}
+
+func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[InitiatePaymentRequest, InitiatePaymentResponse] {
+	// TODO
+	return func(ctx context.Context, request *InitiatePaymentRequest, logger logging.Logger) (*InitiatePaymentResponse, error) {
 		return nil, nil
 	}
 }
@@ -149,6 +169,16 @@ func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest
 }
 
 func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactionResponse, w http.ResponseWriter) error {
+	return nil
+}
+
+func initiatePaymentRequestHandler(r *http.Request) (*InitiatePaymentRequest, error) {
+	// TODO
+	return nil, nil
+}
+
+func initiatePaymentResponseHandler(ctx context.Context, res *InitiatePaymentResponse, w http.ResponseWriter) error {
+	// TODO
 	return nil
 }
 

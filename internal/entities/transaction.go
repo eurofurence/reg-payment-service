@@ -71,7 +71,7 @@ type Transaction struct {
 	Comment           string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci"`
 	Deletion          Deletion          `gorm:"embedded;embeddedPrefix:deleted_"`
 	EffectiveDate     sql.NullTime      `gorm:"type:date;NOT NULL"`
-	DueDate           sql.NullTime      `gorm:"type:date;default:NULL"`
+	DueDate           sql.NullTime      `gorm:"type:date;NULL;default:NULL"`
 }
 
 type Amount struct {

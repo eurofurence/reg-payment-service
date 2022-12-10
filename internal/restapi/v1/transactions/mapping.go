@@ -5,7 +5,7 @@ import (
 )
 
 func ToV1Transaction(tran entities.Transaction) Transaction {
-	return Transaction{
+	result := Transaction{
 		DebitorID:             tran.DebitorID,
 		TransactionIdentifier: tran.TransactionID,
 		TransactionType:       tran.TransactionType,
@@ -20,7 +20,13 @@ func ToV1Transaction(tran entities.Transaction) Transaction {
 		Info:            make(map[string]interface{}), // TODO (no field)
 		PaymentStartUrl: tran.PayLinkURL,
 		EffectiveDate:   tran.EffectiveDate.Time.Format("2006-01-02"),
-		DueDate:         tran.DueDate.Time.Format("2006-01-02"),
 		CreationDate:    tran.CreatedAt,
 	}
+
+	if !tran.DueDate.Time.IsZero() {
+		result.DueDate = tran.DueDate.Time.Format("2006-01-02")
+	}
+
+	return result
+
 }

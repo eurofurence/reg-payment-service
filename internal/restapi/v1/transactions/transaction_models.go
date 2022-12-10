@@ -6,6 +6,10 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
+type InitiatePaymentRequest struct{}
+
+type InitiatePaymentResponse struct{}
+
 // GetTransactionsRequest will contain all information that will be sent from the
 // client during calling the GetTransactions endpoint
 type GetTransactionsRequest struct {
@@ -65,7 +69,7 @@ type Transaction struct {
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
 	EffectiveDate         string                      `json:"effective_date"`
-	DueDate               string                      `json:"due_date"`
+	DueDate               string                      `json:"due_date,omitempty"`
 	CreationDate          time.Time                   `json:"creation_date"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }

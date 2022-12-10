@@ -39,10 +39,11 @@ func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Cont
 	return &entities.Transaction{}, errors.New("no matching transaction in database")
 }
 
-func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	result := make([]entities.Transaction, 0)
 	for _, t := range m.transactions {
-		if t.DebitorID == debitorID {
+		// TODO check all parameters
+		if t.DebitorID == query.DebitorID {
 			result = append(result, t)
 		}
 	}
