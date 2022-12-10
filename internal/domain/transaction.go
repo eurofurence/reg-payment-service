@@ -2,7 +2,6 @@ package domain
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -10,88 +9,60 @@ var (
 	errUnkonwnTransactionType error = errors.New("transaction type not known")
 )
 
-type TransactionType int
+type TransactionType string
 
 const (
-	Due TransactionType = iota
-	Payment
+	TransactionTypeDue      TransactionType = "due"
+	TransactionTypePayement TransactionType = "payment"
 )
 
-var transactionTypeName = map[TransactionType]string{
-	Due:     "Due",
-	Payment: "Payment",
-}
-
-var transactionTypeValue = map[string]TransactionType{
-	"DUE":     Due,
-	"PAYMENT": Payment,
-}
-
-func (t TransactionType) Descriptor() string {
-	if tn, ok := transactionTypeName[t]; ok {
-		return tn
+func (t TransactionType) IsValid() bool {
+	switch t {
+	case TransactionTypeDue, TransactionTypePayement:
+		return true
 	}
 
-	return ""
+	return false
 }
 
-func TransactionTypeFromString(str string) (TransactionType, error) {
-	if tv, ok := transactionTypeValue[strings.ToUpper(str)]; ok {
-		return tv, nil
-	}
-
-	return -1, errUnkonwnTransactionType
-}
-
-type PaymentMethod int
+type PaymentMethod string
 
 const (
-	Credit PaymentMethod = iota
-	Paypal
-	Transfer
-	Internal
-	Gift
+	PaymentMethodCredit   PaymentMethod = "credit"
+	PaymentMethodPaypal   PaymentMethod = "paypal"
+	PaymentMethodTransfer PaymentMethod = "transfer"
+	PaymentMethodInternal PaymentMethod = "internal"
+	PaymentMethodGift     PaymentMethod = "gift"
 )
 
-var paymentMethodName = map[PaymentMethod]string{
-	Credit:   "Credit",
-	Paypal:   "Paypal",
-	Transfer: "Transfer",
-	Internal: "Internal",
-	Gift:     "Gift",
-}
-
-func (m PaymentMethod) Descriptor() string {
-	if pm, ok := paymentMethodName[m]; ok {
-		return pm
+func (p PaymentMethod) IsValid() bool {
+	switch p {
+	case PaymentMethodCredit, PaymentMethodPaypal, PaymentMethodTransfer, PaymentMethodInternal, PaymentMethodGift:
+		return true
 	}
 
-	return ""
+	return false
 }
 
-type TransactionStatus int
+type TransactionStatus string
 
 const (
-	Pending TransactionStatus = iota
-	Tentative
-	Valid
-	Deleted
+	TransactionStatusTentative TransactionStatus = "tentative"
+	TransactionStatusPending   TransactionStatus = "pending"
+	TransactionStatusValid     TransactionStatus = "valid"
+	TransactionStatusDeleted   TransactionStatus = "deleted"
 )
 
-var transactionStatusName = map[TransactionStatus]string{
-	Pending:   "Pending",
-	Tentative: "Tentative",
-	Valid:     "Valid",
-	Deleted:   "Deleted",
-}
-
-func (t TransactionStatus) Descriptor() string {
-	if ts, ok := transactionStatusName[t]; ok {
-		return ts
+func (t TransactionStatus) IsValid() bool {
+	switch t {
+	case TransactionStatusTentative, TransactionStatusPending, TransactionStatusValid, TransactionStatusDeleted:
+		return true
 	}
 
-	return ""
+	return false
 }
+
+type AccountingDate string
 
 type Deletion struct {
 	PreviousStatus TransactionStatus

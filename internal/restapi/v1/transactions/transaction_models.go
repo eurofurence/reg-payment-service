@@ -1,59 +1,9 @@
 package v1transactions
 
-import "time"
-
-type TransactionType string
-
-const (
-	TransactionTypeDue      TransactionType = "due"
-	TransactionTypePayement TransactionType = "payment"
+import (
+	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"time"
 )
-
-func (t TransactionType) IsValid() bool {
-	switch t {
-	case TransactionTypeDue, TransactionTypePayement:
-		return true
-	}
-
-	return false
-}
-
-type PaymentMethod string
-
-const (
-	PaymentMethodCredit   PaymentMethod = "credit"
-	PaymentMethodPaypal   PaymentMethod = "paypal"
-	PaymentMethodTransfer PaymentMethod = "transfer"
-	PaymentMethodInternal PaymentMethod = "internal"
-	PaymentMethodGift     PaymentMethod = "gift"
-)
-
-func (p PaymentMethod) IsValid() bool {
-	switch p {
-	case PaymentMethodCredit, PaymentMethodPaypal, PaymentMethodTransfer, PaymentMethodInternal, PaymentMethodGift:
-		return true
-	}
-
-	return false
-}
-
-type TransactionStatus string
-
-const (
-	TransactionStatusTentative TransactionStatus = "tentative"
-	TransactionStatusPending   TransactionStatus = "pending"
-	TransactionStatusValid     TransactionStatus = "valid"
-	TransactionStatusDeleted   TransactionStatus = "deleted"
-)
-
-func (t TransactionStatus) IsValid() bool {
-	switch t {
-	case TransactionStatusTentative, TransactionStatusPending, TransactionStatusValid, TransactionStatusDeleted:
-		return true
-	}
-
-	return false
-}
 
 // GetTransactionsRequest will contain all information that will be sent from the
 // client during calling the GetTransactions endpoint
@@ -84,10 +34,10 @@ type Amount struct {
 type PaymentProcessorInformation map[string]interface{}
 
 type StatusHistory struct {
-	Status     TransactionStatus `json:"status"`
-	Comment    string            `json:"comment"`
-	ChangedBy  string            `json:"changed_by"`
-	ChangeDate time.Time         `json:"change_date"`
+	Status     domain.TransactionStatus `json:"status"`
+	Comment    string                   `json:"comment"`
+	ChangedBy  string                   `json:"changed_by"`
+	ChangeDate time.Time                `json:"change_date"`
 }
 
 // CreateTrasactionRequest contains all information to create a new transaction for a given debitor
@@ -102,21 +52,19 @@ type UpdateTransactionRequest struct{}
 
 type UpdateTransactionResponse struct{}
 
-type AccountingDate string
-
 type Transaction struct {
 	// TODO missing ID for responses -> can't update
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
-	TransactionType       TransactionType             `json:"transaciont_type"`
-	Method                PaymentMethod               `json:"method"`
+	TransactionType       domain.TransactionType      `json:"transaciont_type"`
+	Method                domain.PaymentMethod        `json:"method"`
 	Amount                Amount                      `json:"amount"`
 	Comment               string                      `json:"comment"`
-	Status                TransactionStatus           `json:"status"`
+	Status                domain.TransactionStatus    `json:"status"`
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
-	EffectiveDate         AccountingDate              `json:"effective_date"`
-	DueDate               AccountingDate              `json:"due_date"`
+	EffectiveDate         domain.AccountingDate       `json:"effective_date"`
+	DueDate               domain.AccountingDate       `json:"due_date"`
 	CreationDate          time.Time                   `json:"creation_date"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }
