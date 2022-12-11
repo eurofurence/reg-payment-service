@@ -2,8 +2,8 @@ package v1transactions
 
 import (
 	"context"
+	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -13,20 +13,28 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
 
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
 
-func setupServer(t *testing.T) (string, func()) {
+//go:generate moq -pkg v1transactions -stub -out attendeeservice_moq_test.go ../../../repository/downstreams/attendeeservice/ AttendeeService
+//go:generate moq -pkg v1transactions -stub -out cncrdadapter_moq_test.go ../../../repository/downstreams/cncrdadapter/ CncrdAdapter
+
+func setupServer(t *testing.T, att *AttendeeServiceMock, cncrd *CncrdAdapterMock) (string, func()) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestIdMiddleware())
 	router.Use(middleware.LogRequestIdMiddleware())
 	router.Use(middleware.CorsHeadersMiddleware(nil))
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface
-		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(), logging.NewNoopLogger())
+		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(),
+			att, cncrd,
+			logging.NewNoopLogger())
+
 		require.NoError(t, err)
 		Create(r, s)
 	})
@@ -39,22 +47,227 @@ func setupServer(t *testing.T) (string, func()) {
 
 }
 
-func TestHandleTransactionsGet(t *testing.T) {
-	url, close := setupServer(t)
-	defer close()
+func newTransaction(debID int64, tranID string,
+	pType entities.TransactionType,
+	method entities.PaymentMethod,
+	status entities.TransactionStatus,
+	effDate time.Time,
+) entities.Transaction {
+	return entities.Transaction{
+		DebitorID:         debID,
+		TransactionID:     tranID,
+		TransactionType:   pType,
+		PaymentMethod:     method,
+		PaymentStartUrl:   "not set",
+		TransactionStatus: status,
+		Amount: entities.Amount{
+			ISOCurrency: "EUR",
+			GrossCent:   1900,
+			VatRate:     19.0,
+		},
+		Comment: "Comment",
+		EffectiveDate: sql.NullTime{
+			Time:  effDate,
+			Valid: true,
+		},
+	}
+}
 
-	apiBasePath := fmt.Sprintf("%s/%s", url, "api/rest/v1")
-
-	cl := http.DefaultClient
-
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, fmt.Sprintf("%s/%s", apiBasePath, "transactions/10"), nil)
+func newEffDate(t *testing.T, s string) time.Time {
+	eff, err := parseEffectiveDate(s)
 	require.NoError(t, err)
 
-	resp, err := cl.Do(req)
+	return eff
+}
 
-	require.NoError(t, resp.Body.Close())
-	require.NoError(t, err)
+func fillDefaultDBValues(t *testing.T, db database.Repository) {
 
+	transactions := []entities.Transaction{
+		newTransaction(1, "1234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01")),
+		newTransaction(1, "1234567891", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-10")),
+		newTransaction(1, "1234567892", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-20")),
+		newTransaction(1, "1234567893", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-28")),
+		newTransaction(1, "1234567894", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-29")),
+		newTransaction(1, "1234567895", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-30")),
+
+		newTransaction(2, "2234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01")),
+		newTransaction(2, "2234567891", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-10")),
+		newTransaction(2, "2234567892", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-20")),
+		newTransaction(2, "2234567893", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-28")),
+		newTransaction(2, "2234567894", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-29")),
+		newTransaction(2, "2234567895", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-30")),
+	}
+
+	for _, tr := range transactions {
+		db.CreateTransaction(context.Background(), tr)
+	}
+}
+
+func TestHandleTransactions(t *testing.T) {
+
+	type args struct {
+		att       *AttendeeServiceMock
+		cncrd     *CncrdAdapterMock
+		db        database.Repository
+		populator func(*testing.T, database.Repository)
+		request   GetTransactionsRequest
+	}
+
+	type expected struct {
+		response *GetTransactionsResponse
+		err      error
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "Should return transactions for debitor ID",
+			args: args{
+				att:   &AttendeeServiceMock{},
+				cncrd: &CncrdAdapterMock{},
+				db:    inmemory.NewInMemoryProvider(),
+				populator: func(t *testing.T, db database.Repository) {
+					fillDefaultDBValues(t, db)
+				},
+				request: GetTransactionsRequest{
+					DebitorID: 1,
+				},
+			},
+			expected: expected{
+				response: &GetTransactionsResponse{
+					Payload: []Transaction{
+						ToV1Transaction(newTransaction(1, "1234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01"))),
+						ToV1Transaction(newTransaction(1, "1234567891", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-10"))),
+						ToV1Transaction(newTransaction(1, "1234567892", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-20"))),
+						ToV1Transaction(newTransaction(1, "1234567893", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-28"))),
+						ToV1Transaction(newTransaction(1, "1234567894", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-29"))),
+						ToV1Transaction(newTransaction(1, "1234567895", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-30"))),
+					},
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "Should return transaction for transaction identifier",
+			args: args{
+				att:   &AttendeeServiceMock{},
+				cncrd: &CncrdAdapterMock{},
+				db:    inmemory.NewInMemoryProvider(),
+				populator: func(t *testing.T, db database.Repository) {
+					fillDefaultDBValues(t, db)
+				},
+				request: GetTransactionsRequest{
+					TransactionIdentifier: "1234567890",
+				},
+			},
+			expected: expected{
+				response: &GetTransactionsResponse{
+					Payload: []Transaction{
+						ToV1Transaction(newTransaction(1, "1234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01"))),
+					},
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "Should return transactions after effective date from",
+			args: args{
+				att:   &AttendeeServiceMock{},
+				cncrd: &CncrdAdapterMock{},
+				db:    inmemory.NewInMemoryProvider(),
+				populator: func(t *testing.T, db database.Repository) {
+					fillDefaultDBValues(t, db)
+				},
+				request: GetTransactionsRequest{
+					EffectiveFrom: newEffDate(t, "2022-12-20"),
+				},
+			},
+			expected: expected{
+				response: &GetTransactionsResponse{
+					Payload: []Transaction{
+						ToV1Transaction(newTransaction(1, "1234567892", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-20"))),
+						ToV1Transaction(newTransaction(1, "1234567893", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-28"))),
+						ToV1Transaction(newTransaction(1, "1234567894", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-29"))),
+						ToV1Transaction(newTransaction(1, "1234567895", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-30"))),
+
+						ToV1Transaction(newTransaction(2, "2234567892", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-20"))),
+						ToV1Transaction(newTransaction(2, "2234567893", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-28"))),
+						ToV1Transaction(newTransaction(2, "2234567894", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-29"))),
+						ToV1Transaction(newTransaction(2, "2234567895", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-30"))),
+					},
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "Should return transactions before effective date before",
+			args: args{
+				att:   &AttendeeServiceMock{},
+				cncrd: &CncrdAdapterMock{},
+				db:    inmemory.NewInMemoryProvider(),
+				populator: func(t *testing.T, db database.Repository) {
+					fillDefaultDBValues(t, db)
+				},
+				request: GetTransactionsRequest{
+					EffectiveBefore: newEffDate(t, "2022-12-20"),
+				},
+			},
+			expected: expected{
+				response: &GetTransactionsResponse{
+					Payload: []Transaction{
+						ToV1Transaction(newTransaction(1, "1234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01"))),
+						ToV1Transaction(newTransaction(1, "1234567891", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-10"))),
+
+						ToV1Transaction(newTransaction(2, "2234567890", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-01"))),
+						ToV1Transaction(newTransaction(2, "2234567891", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, newEffDate(t, "2022-12-10"))),
+					},
+				},
+				err: nil,
+			},
+		},
+		// {
+		// 	name: "Should return transaction for debitor ID and transaction identifier",
+		// },
+		// {
+		// 	name: "Should return transaction for debitor ID and effective date range",
+		// },
+		// {
+		// 	name: "Should not return transactions for invalid data",
+		// },
+	}
+
+	for _, tt := range tests {
+		ctx := context.Background()
+
+		tt.args.populator(t, tt.args.db)
+
+		req := &GetTransactionsRequest{
+			DebitorID:             tt.args.request.DebitorID,
+			TransactionIdentifier: tt.args.request.TransactionIdentifier,
+			EffectiveFrom:         tt.args.request.EffectiveFrom,
+			EffectiveBefore:       tt.args.request.EffectiveBefore,
+		}
+
+		logger := logging.NewNoopLogger()
+
+		i, err := interaction.NewServiceInteractor(tt.args.db, tt.args.att, tt.args.cncrd, logger)
+		require.NoError(t, err)
+
+		fn := MakeGetTransactionsEndpoint(i)
+
+		resp, err := fn(ctx, req, logger)
+		require.NoError(t, err)
+
+		require.Len(t, resp.Payload, len(tt.expected.response.Payload))
+
+		for _, tr := range resp.Payload {
+			require.Contains(t, tt.expected.response.Payload, tr)
+		}
+
+	}
 }
 
 func TestGetTransactionsRequestHandler(t *testing.T) {

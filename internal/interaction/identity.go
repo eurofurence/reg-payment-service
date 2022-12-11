@@ -7,11 +7,11 @@ import (
 )
 
 type IdentityManager struct {
-	subject        string
-	roles          []string
-	isAdmin        bool
-	isAPITokenCall bool
-	isAttendee     bool
+	subject          string
+	roles            []string
+	isAdmin          bool
+	isAPITokenCall   bool
+	isRegisteredUser bool
 }
 
 func (i *IdentityManager) IsAdmin() bool {
@@ -22,8 +22,8 @@ func (i *IdentityManager) IsAPITokenCall() bool {
 	return i.isAPITokenCall
 }
 
-func (i *IdentityManager) IsAttendee() bool {
-	return i.isAttendee && i.subject != ""
+func (i *IdentityManager) IsRegisteredUser() bool {
+	return i.isRegisteredUser && i.subject != ""
 }
 
 func NewIdentityManager(ctx context.Context) *IdentityManager {
@@ -38,11 +38,11 @@ func NewIdentityManager(ctx context.Context) *IdentityManager {
 			manager.subject = claims.Subject
 			manager.roles = claims.Global.Roles
 
-			manager.isAttendee = true
+			manager.isRegisteredUser = true
 
 			for _, role := range claims.Global.Roles {
 				if role == "admin" {
-					manager.isAttendee = false
+					manager.isRegisteredUser = false
 					manager.isAdmin = true
 					break
 				}

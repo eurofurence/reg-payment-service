@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
@@ -60,8 +62,16 @@ func main() {
 
 	//playDatabase(ctx, repo)
 
+	attClient := constructOrFail(ctx, logger, func() (attendeeservice.AttendeeService, error) {
+		return attendeeservice.New(conf.Service.AttendeeService, conf.Security.Fixed.Api)
+	})
+
+	ccClient := constructOrFail(ctx, logger, func() (cncrdadapter.CncrdAdapter, error) {
+		return cncrdadapter.New(conf.Service.ProviderAdapter, conf.Security.Fixed.Api)
+	})
+
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo, logger)
+		return interaction.NewServiceInteractor(repo, attClient, ccClient, logger)
 	})
 
 	logger.Debug("Setting up router")

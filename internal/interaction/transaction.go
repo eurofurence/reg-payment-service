@@ -36,7 +36,7 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		return tran, err
 	}
 
-	if mgr.IsAttendee() {
+	if mgr.IsRegisteredUser() {
 		if err := s.validateAttendeeTransaction(ctx, tran); err != nil {
 			// 403
 			return nil, err

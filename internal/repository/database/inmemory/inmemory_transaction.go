@@ -48,10 +48,12 @@ func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query en
 		if query.TransactionIdentifier != "" && t.TransactionID != query.TransactionIdentifier {
 			continue
 		}
-		if !query.EffectiveFrom.IsZero() && query.EffectiveFrom.After(t.EffectiveDate.Time) || query.EffectiveFrom.Equal(t.EffectiveDate.Time) {
+
+		if !query.EffectiveFrom.IsZero() && query.EffectiveFrom.After(t.EffectiveDate.Time) {
 			continue
 		}
-		if !query.EffectiveBefore.IsZero() && (query.EffectiveBefore.Before(t.EffectiveDate.Time)) {
+		if !query.EffectiveBefore.IsZero() && !t.EffectiveDate.Time.Before(query.EffectiveBefore) {
+			// if !(20 < 28) break
 			continue
 		}
 		result = append(result, t)

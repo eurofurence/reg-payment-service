@@ -25,13 +25,28 @@ type serviceInteractor struct {
 	cncrdClient    cncrdadapter.CncrdAdapter
 }
 
-func NewServiceInteractor(r database.Repository, logger logging.Logger) (Interactor, error) {
+func NewServiceInteractor(r database.Repository,
+	attClient attendeeservice.AttendeeService,
+	ccClient cncrdadapter.CncrdAdapter,
+	logger logging.Logger,
+) (Interactor, error) {
+
 	if r == nil {
 		return nil, errors.New("repository must not be nil")
 	}
 
+	if attClient == nil {
+		return nil, errors.New("no attendee service client provided")
+	}
+
+	if ccClient == nil {
+		return nil, errors.New("cncrd adapter client provided")
+	}
+
 	return &serviceInteractor{
-		logger: logger,
-		store:  r,
+		logger:         logger,
+		store:          r,
+		attendeeClient: attClient,
+		cncrdClient:    ccClient,
 	}, nil
 }
