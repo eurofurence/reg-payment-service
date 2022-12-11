@@ -18,7 +18,7 @@ func ToV1Transaction(tran entities.Transaction) Transaction {
 		Comment:         tran.Comment,
 		Status:          tran.TransactionStatus,
 		Info:            make(map[string]interface{}), // TODO (no field)
-		PaymentStartUrl: tran.PayLinkURL,
+		PaymentStartUrl: tran.PaymentStartUrl,
 		EffectiveDate:   tran.EffectiveDate.Time.Format("2006-01-02"),
 		CreationDate:    tran.CreatedAt,
 	}

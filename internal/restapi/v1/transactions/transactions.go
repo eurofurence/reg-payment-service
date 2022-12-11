@@ -2,6 +2,7 @@ package v1transactions
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-http-utils/headers"
 
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
@@ -70,8 +72,50 @@ func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTr
 
 func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
 	return func(ctx context.Context, request *CreateTransactionRequest, logger logging.Logger) (*CreateTransactionResponse, error) {
+		tr := request.Transaction
 
-		return nil, nil
+		effDate, err := parseEffectiveDate(tr.EffectiveDate)
+		if err != nil {
+			return nil, err
+		}
+
+		tran := &entities.Transaction{
+			DebitorID:         tr.DebitorID,
+			TransactionID:     tr.TransactionIdentifier,
+			TransactionType:   tr.TransactionType,
+			PaymentMethod:     tr.Method,
+			PaymentStartUrl:   tr.PaymentStartUrl,
+			TransactionStatus: tr.Status,
+			Amount: entities.Amount{
+				ISOCurrency: tr.Amount.Currency,
+				GrossCent:   tr.Amount.GrossCent,
+				VatRate:     tr.Amount.VatRate,
+			},
+			Comment: tr.Comment,
+			EffectiveDate: sql.NullTime{
+				Valid: true,
+				Time:  effDate,
+			},
+		}
+
+		if tr.DueDate != "" {
+			dueDate, err := parseEffectiveDate(tr.DueDate)
+			if err != nil {
+				return nil, err
+			}
+
+			tran.DueDate = sql.NullTime{
+				Valid: true,
+				Time:  dueDate,
+			}
+		}
+
+		transaction, err := i.CreateTransaction(ctx, tran)
+		if err != nil {
+			return nil, err
+		}
+
+		return &CreateTransactionResponse{Transaction: ToV1Transaction(*transaction)}, nil
 	}
 }
 
@@ -135,12 +179,7 @@ func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsRes
 		return nil
 	}
 
-	err := json.NewEncoder(w).Encode(res)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return json.NewEncoder(w).Encode(res)
 }
 
 func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
@@ -160,8 +199,10 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 }
 
 func createTransactionResponseHandler(ctx context.Context, res *CreateTransactionResponse, w http.ResponseWriter) error {
+	w.Header().Add(headers.Location, fmt.Sprintf("v1/transactions/%s", res.Transaction.TransactionIdentifier))
+	w.WriteHeader(http.StatusCreated)
 
-	return nil
+	return json.NewEncoder(w).Encode(res)
 }
 
 func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
@@ -200,16 +241,6 @@ func parseEffectiveDate(effDate string) (time.Time, error) {
 }
 
 func validateTransaction(t *Transaction) error {
-
-	// Todo validation
-	/*
-			      required:
-		        - amount
-		        - status
-		        - effective_date
-	*/
-
-	// 0 is not a valid debitor ID
 	if t.DebitorID <= 0 {
 		return fmt.Errorf("invalid debitor id supplied - DebitorID: %d", t.DebitorID)
 	}
@@ -222,13 +253,9 @@ func validateTransaction(t *Transaction) error {
 		return fmt.Errorf("invalid payment method - Method: %s", string(t.Method))
 	}
 
-	// We cannot validate the status when creating a new transaction. Therefore the status cannot be required, right?
-	//
-	// This requires some more information @Jumpy
-
-	// if !t.Status.IsValid() {
-	// 	return fmt.Errorf("invalid transaction status - Method: %s", string(t.Status))
-	// }
+	if !t.Status.IsValid() || t.Status == entities.TransactionStatusDeleted {
+		return fmt.Errorf("invalid transaction status - Method: %s", string(t.Status))
+	}
 
 	return nil
 }

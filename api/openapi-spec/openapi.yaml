@@ -134,7 +134,7 @@ paths:
               schema:
                 type: string
               description: URL of the created resource, ending in the assigned transaction ID.
-              example: /v1/transactions/481
+              example: /v1/transactions/EF2023-000001-0210-123000-4711
           content:
             application/json:
               schema:

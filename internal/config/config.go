@@ -2,6 +2,7 @@ package config
 
 import (
 	"crypto/rsa"
+	"errors"
 	"io"
 
 	"gopkg.in/yaml.v3"
@@ -20,6 +21,8 @@ const (
 	ECS   LogStyle = "ecs" // default
 )
 
+var appConfig *Application
+
 type (
 	// Application is the root configuration type
 	// that holds all other subconfiguration types
@@ -34,9 +37,11 @@ type (
 	// ServiceConfig contains configuration values
 	// for service related tasks. E.g. URL to payment provider adapter
 	ServiceConfig struct {
-		Name            string `yaml:"name"`
-		AttendeeService string `yaml:"attendee_service"`
-		ProviderAdapter string `yaml:"provider_adapter"`
+		Name                string   `yaml:"name"`
+		AttendeeService     string   `yaml:"attendee_service"`
+		ProviderAdapter     string   `yaml:"provider_adapter"`
+		TransactionIDPrefix string   `yaml:"transaction_id_prefix"`
+		AllowedCurrencies   []string `yaml:"allowed_currencies"`
 	}
 
 	// ServerConfig contains all values for
@@ -108,4 +113,12 @@ func UnmarshalFromYamlConfiguration(file io.Reader) (*Application, error) {
 	}
 
 	return &conf, nil
+}
+
+func GetApplicationConfig() (*Application, error) {
+	if appConfig == nil {
+		return nil, errors.New("config was not yet loaded")
+	}
+
+	return appConfig, nil
 }

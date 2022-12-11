@@ -2,6 +2,9 @@ service:
   name: 'Registration Payment Service'
   attendee_service: 'http://localhost:9091' # do not include trailing slash
   provider_adapter: 'http://localhost:9097' # do not include trailing slash
+  transaction_id_prefix: "EF2023"
+  allowed_currencies:
+    - 'EUR'
 server:
   port: 9092
   read_timeout_seconds: 30
