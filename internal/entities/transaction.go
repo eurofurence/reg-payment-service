@@ -9,13 +9,13 @@ import (
 type TransactionType string
 
 const (
-	TransactionTypeDue      TransactionType = "due"
-	TransactionTypePayement TransactionType = "payment"
+	TransactionTypeDue     TransactionType = "due"
+	TransactionTypePayment TransactionType = "payment"
 )
 
 func (t TransactionType) IsValid() bool {
 	switch t {
-	case TransactionTypeDue, TransactionTypePayement:
+	case TransactionTypeDue, TransactionTypePayment:
 		return true
 	}
 
