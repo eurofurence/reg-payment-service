@@ -20,7 +20,10 @@ func ToV1Transaction(tran entities.Transaction) Transaction {
 		Info:            make(map[string]interface{}), // TODO (no field)
 		PaymentStartUrl: tran.PaymentStartUrl,
 		EffectiveDate:   tran.EffectiveDate.Time.Format("2006-01-02"),
-		CreationDate:    tran.CreatedAt,
+	}
+
+	if !tran.CreatedAt.IsZero() {
+		result.CreationDate = &tran.CreatedAt
 	}
 
 	if !tran.DueDate.Time.IsZero() {

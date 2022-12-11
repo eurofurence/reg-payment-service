@@ -59,10 +59,9 @@ type UpdateTransactionRequest struct{}
 type UpdateTransactionResponse struct{}
 
 type Transaction struct {
-	// TODO missing ID for responses -> can't update
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
-	TransactionType       entities.TransactionType    `json:"transaciont_type"`
+	TransactionType       entities.TransactionType    `json:"transaction_type"`
 	Method                entities.PaymentMethod      `json:"method"`
 	Amount                Amount                      `json:"amount"`
 	Comment               string                      `json:"comment"`
@@ -71,6 +70,6 @@ type Transaction struct {
 	PaymentStartUrl       string                      `json:"payment_start_url"`
 	EffectiveDate         string                      `json:"effective_date"`
 	DueDate               string                      `json:"due_date,omitempty"`
-	CreationDate          time.Time                   `json:"creation_date"`
+	CreationDate          *time.Time                  `json:"creation_date,omitempty"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }

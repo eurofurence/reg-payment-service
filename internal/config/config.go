@@ -112,6 +112,7 @@ func UnmarshalFromYamlConfiguration(file io.Reader) (*Application, error) {
 		return nil, err
 	}
 
+	appConfig = &conf
 	return &conf, nil
 }
 

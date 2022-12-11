@@ -184,7 +184,6 @@ func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsRes
 
 func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
 	var request CreateTransactionRequest
-
 	err := json.NewDecoder(r.Body).Decode(&request.Transaction)
 
 	if err != nil {
@@ -199,9 +198,9 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 }
 
 func createTransactionResponseHandler(ctx context.Context, res *CreateTransactionResponse, w http.ResponseWriter) error {
-	w.Header().Add(headers.Location, fmt.Sprintf("v1/transactions/%s", res.Transaction.TransactionIdentifier))
-	w.WriteHeader(http.StatusCreated)
+	w.Header().Add(headers.Location, fmt.Sprintf("api/rest/v1/transactions/%s", res.Transaction.TransactionIdentifier))
 
+	w.WriteHeader(http.StatusCreated)
 	return json.NewEncoder(w).Encode(res)
 }
 

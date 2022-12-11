@@ -20,18 +20,18 @@ func (m *mysqlConnector) CreateTransaction(ctx context.Context, tr entities.Tran
 	defer cancel()
 
 	// Transactions of type due can only be created once.
-	if tr.TransactionType == entities.TransactionTypeDue {
-		var exists int64
-		m.db.WithContext(tCtx).Model(&entities.Transaction{}).
-			Where(&entities.Transaction{
-				TransactionID:   tr.TransactionID,
-				TransactionType: entities.TransactionTypeDue,
-			}).
-			Count(&exists)
-		if exists > 0 {
-			return ErrTransactionExists
-		}
-	}
+	// if tr.TransactionType == entities.TransactionTypeDue {
+	// 	var exists int64
+	// 	m.db.WithContext(tCtx).Model(&entities.Transaction{}).
+	// 		Where(&entities.Transaction{
+	// 			TransactionID:   tr.TransactionID,
+	// 			TransactionType: entities.TransactionTypeDue,
+	// 		}).
+	// 		Count(&exists)
+	// 	if exists > 0 {
+	// 		return ErrTransactionExists
+	// 	}
+	// }
 
 	result := m.db.WithContext(tCtx).Create(&tr)
 

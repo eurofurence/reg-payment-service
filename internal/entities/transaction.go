@@ -62,7 +62,7 @@ func (t TransactionStatus) IsValid() bool {
 type Transaction struct {
 	gorm.Model
 	DebitorID         int64             `gorm:"index;type:bigint;NOT NULL"`
-	TransactionID     string            `gorm:"index;type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
+	TransactionID     string            `gorm:"uniqueIndex:idx_uq_tid;type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
 	TransactionType   TransactionType   `gorm:"type:enum('due', 'payment')"`
 	PaymentMethod     PaymentMethod     `gorm:"type:enum('credit', 'paypal', 'transfer', 'internal', 'gift')"`
 	PaymentStartUrl   string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;default:NULL"`
@@ -88,6 +88,24 @@ type Deletion struct {
 
 func (t *Transaction) ToTransactionLog() TransactionLog {
 	return TransactionLog{
-		Transaction: *t,
+		DebitorID:         t.DebitorID,
+		TransactionID:     t.TransactionID,
+		TransactionType:   t.TransactionType,
+		PaymentMethod:     t.PaymentMethod,
+		PaymentStartUrl:   t.PaymentStartUrl,
+		TransactionStatus: t.TransactionStatus,
+		Amount: Amount{
+			ISOCurrency: t.Amount.ISOCurrency,
+			GrossCent:   t.Amount.GrossCent,
+			VatRate:     t.Amount.VatRate,
+		},
+		Comment: t.Comment,
+		Deletion: Deletion{
+			Status:  t.Deletion.Status,
+			Comment: t.Deletion.Comment,
+			By:      t.Deletion.By,
+		},
+		EffectiveDate: t.EffectiveDate,
+		DueDate:       t.DueDate,
 	}
 }

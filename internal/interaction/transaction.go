@@ -2,7 +2,10 @@ package interaction
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
@@ -13,7 +16,9 @@ func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query
 }
 
 func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error) {
-	// TODO: call downstream service
+
+	// TODO: implement identity management
+	// TODO: call attendee service if needed
 
 	if tran.TransactionID == "" {
 		id, err := generateTransactionID(tran)
@@ -23,7 +28,10 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 		tran.TransactionID = id
 	}
+
 	err := s.store.CreateTransaction(ctx, *tran)
+
+	// TODO: call downstream cncrd adapter service
 
 	return tran, err
 }
@@ -33,11 +41,30 @@ func generateTransactionID(tran *entities.Transaction) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	srvConf := appConfig.Service
 
-	// TODO generate transaction ID
-	return fmt.Sprintf("%s-%d-%s-%d", srvConf.TransactionIDPrefix, tran.DebitorID), nil
+	parsedTime := time.Now().UTC().Format("0102-150405")
+	return fmt.Sprintf("%s-%06d-%s-%s", appConfig.Service.TransactionIDPrefix, tran.DebitorID, parsedTime, randomDigits(4)), nil
 
-	//{prefix-from-config}-NNNNNN-MMDD-HHMMSS-RRRR
+}
 
+var digitRunes = []rune("0123456789")
+
+func randomDigits(count int) string {
+	if count < 0 {
+		return ""
+	}
+
+	res := make([]rune, count)
+
+	for i := 0; i < count; i++ {
+		rnd, err := rand.Int(rand.Reader, big.NewInt(int64(len(digitRunes))))
+		if err != nil {
+			return ""
+		}
+
+		res[i] = digitRunes[rnd.Int64()]
+
+	}
+
+	return string(res)
 }
