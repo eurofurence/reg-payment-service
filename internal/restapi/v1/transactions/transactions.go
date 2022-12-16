@@ -205,10 +205,17 @@ func createTransactionResponseHandler(ctx context.Context, res *CreateTransactio
 }
 
 func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
-	return nil, nil
+	var request UpdateTransactionRequest
+	if err := json.NewDecoder(r.Body).Decode(&request.Transaction); err != nil {
+		return nil, err
+	}
+
+	return &request, nil
 }
 
 func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactionResponse, w http.ResponseWriter) error {
+	// Write status header without content here
+	w.WriteHeader(http.StatusNoContent)
 	return nil
 }
 

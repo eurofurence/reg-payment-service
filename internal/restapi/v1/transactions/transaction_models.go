@@ -54,7 +54,9 @@ type CreateTransactionResponse struct {
 	Transaction Transaction `json:"transaction"`
 }
 
-type UpdateTransactionRequest struct{}
+type UpdateTransactionRequest struct {
+	Transaction Transaction `json:"transaction"`
+}
 
 type UpdateTransactionResponse struct{}
 
