@@ -3,11 +3,11 @@ package interaction
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
@@ -30,7 +30,10 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 		err := s.store.CreateTransaction(ctx, *tran)
 		if tran.TransactionType == entities.TransactionTypePayment {
-			s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID))
+			err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID))
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return tran, err
@@ -38,7 +41,6 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 	if mgr.IsRegisteredUser() {
 		if err := s.validateAttendeeTransaction(ctx, tran); err != nil {
-			// 403
 			return nil, err
 		}
 
@@ -54,42 +56,43 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 	}
 
-	return nil, errors.New("400")
+	return nil, apierrors.NewForbidden("unable to determine the request permissions")
 }
 
-func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, tran *entities.Transaction) error {
+func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, newTransaction *entities.Transaction) error {
 	debitorIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
 	if err != nil {
 		return err
 	}
 
-	if !containsDebitor(debitorIDs, tran.DebitorID) {
-		return fmt.Errorf("transactions for debitorID %d may not be altered", tran.DebitorID)
+	if !containsDebitor(debitorIDs, newTransaction.DebitorID) {
+		return apierrors.NewForbidden(fmt.Sprintf("transactions for debitorID %d may not be altered", newTransaction.DebitorID))
 	}
 
-	if tran.TransactionType != entities.TransactionTypePayment ||
-		tran.TransactionStatus != entities.TransactionStatusTentative ||
-		tran.PaymentMethod != entities.PaymentMethodCredit {
+	if newTransaction.TransactionType != entities.TransactionTypePayment ||
+		newTransaction.TransactionStatus != entities.TransactionStatusTentative ||
+		newTransaction.PaymentMethod != entities.PaymentMethodCredit {
 
 		// only payment transactions
 		// only status tentative
 		// only method credit
 		// -> Status 403
-
-		return errors.New("transaction is not in a valid state")
+		return apierrors.NewForbidden("transaction is not in a valid state")
 	}
 
-	// TODO: Continue here
+	// We defined, that we only query transactions in status valid.
+	// What if we have tentative transactions of type payment here?
+	// Then we would create transactions, where we exceed the due amount.
+	currentTransactions, err := s.store.GetValidTransactionsForDebitor(ctx, newTransaction.DebitorID)
+	if err != nil {
+		return err
+	}
 
-	// check if outstanding dues
-	// sum all status valid due transactions
-	// subtract all valid payments
-	// where debitorID == currentDebID
-	// -> current_dues
 	// in error case: 400
-
-	// don't allow partial payments
-	// Amount Grosscent == sum(current_dues)
+	// if partial payment || no outstanding dues
+	if !s.isValidPayment(currentTransactions, newTransaction) {
+		return apierrors.NewBadRequest("no outstanding dues or partial payment")
+	}
 
 	return nil
 }
@@ -135,4 +138,45 @@ func randomDigits(count int) string {
 	}
 
 	return string(res)
+}
+
+func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transaction, newTran *entities.Transaction) bool {
+	var allDues int64
+	var allPayments int64
+
+	for _, t := range curTransactions {
+		// Do we need a currency check here?
+		// if t.Amount.ISOCurrency != newTran.Amount.ISOCurrency {
+		//  s.logger.Error(...)
+		// 	return false
+		// }
+
+		if t.TransactionType == entities.TransactionTypeDue {
+			allDues += t.Amount.GrossCent
+		} else if t.TransactionType == entities.TransactionTypePayment {
+			allPayments += t.Amount.GrossCent
+		}
+	}
+
+	// check if there are any outstanding dues
+	// sum all status valid due transactions
+	// subtract all valid payments
+	// -> current_dues
+
+	// can we have negative dues if we owe an attendee money?
+	if allDues <= 0 {
+		s.logger.Info("No outstanding dues for attendee %d", newTran.DebitorID)
+		return false
+	}
+
+	remaining := allDues - allPayments
+
+	if remaining < 0 || newTran.Amount.GrossCent != remaining {
+		// we do not allow partial payments from attendees
+		// Admins or s2s calls will not use this validation logic
+		s.logger.Info("rejected partial payment for attendee %d", newTran.DebitorID)
+		return false
+	}
+
+	return true
 }

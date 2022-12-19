@@ -15,6 +15,8 @@ function _usage() {
         -i, --transaction           Provide a custom transaction ID
         -m, --method string         Method (credit, paypal, transfer, internal, gift). Default "credit"
         -t, --type                  Transaction type: (due, payment). Default "due"
+        -s, --status                Transaction status: ('tentative', 'pending', 'valid', 'deleted'). Default valid
+        -c, --cent                  Gross cent amount. Default 1400
         -h, --help                  Show this message
 
 
@@ -30,6 +32,13 @@ function _usage() {
         ./create-transaction.sh --jwt \\
             -d 101 \\
             -m credit 
+        
+        ./create-transaction.sh --jwt \\
+            -d 101 \\
+            -m credit \\
+            -t payment \\
+            -s tentative \\
+            -c 1200
             
 EOF
 exit 0
@@ -80,6 +89,18 @@ while [[ $# -gt 0 ]]; do
         TYPE=$2
         shift 2
         ;;
+        -c|--cent)
+        echo $2
+        if ! [[ $2 =~ ^[0-9]+$ ]]; then
+            _usage
+        fi
+        AMOUNT=$2
+        shift 2
+        ;;
+        -s|--status)
+        STATUS=$2
+        shift 2
+        ;;
         *)
         shift
         ;;
@@ -87,6 +108,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+echo "creating transaction...."
 
 CREATE_TRANSACTION_URL="http://localhost:9092/api/rest/v1/transactions"
 JSON_DATA=$(cat <<EOF
@@ -97,11 +119,11 @@ JSON_DATA=$(cat <<EOF
   "method": "${METHOD}",
   "amount": {
     "currency": "EUR",
-    "gross_cent": 14000,
-    "vat_rate": 7.7
+    "gross_cent": ${AMOUNT:-14000},
+    "vat_rate": 19.0
   },
   "comment": "This is a test transaction",
-  "status": "valid",
+  "status": "${STATUS:-valid}",
   "payment_processor_information": {
     "id": 72168763,
     "booking_code": "something"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
@@ -49,6 +50,34 @@ func CreateHandler[Req, Res any](endpoint Endpoint[Req, Res],
 
 		if err != nil {
 			logger.Error("An error occurred during the request. [error]: %v", err)
+
+			// check if the error is a `StatusError`
+			if status := apierrors.AsAPIStatus(err); status != nil {
+
+				// TODO enhance
+				switch {
+				case apierrors.IsBadRequestError(err):
+					SendBadRequestResponse(w, reqID, logger, status.Status().Details)
+				case apierrors.IsUnauthorizedError(err):
+					SendUnauthorizedResponse(w, reqID, logger, status.Status().Details)
+				case apierrors.IsForbiddenError(err):
+					SendForbiddenResponse(w, reqID, logger, status.Status().Details)
+				case apierrors.IsNotFoundError(err):
+					SendStatusNotFoundResponse(w, reqID, logger, status.Status().Details)
+				case apierrors.IsConflictError(err):
+					SendConflictResponse(w, reqID, logger, status.Status().Details)
+				case apierrors.IsInternalServerError(err):
+					SendInternalServerError(w,
+						reqID,
+						APIErrorMessage(status.Status().Message),
+						logger,
+						status.Status().Details,
+					)
+				}
+
+				return
+			}
+
 			SendInternalServerError(w, reqID, APIErrorMessage(err.Error()), logger, "")
 			return
 		}

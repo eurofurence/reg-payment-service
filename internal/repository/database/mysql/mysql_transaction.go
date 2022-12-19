@@ -113,3 +113,29 @@ func (m *mysqlConnector) GetTransactionsByFilter(ctx context.Context, query enti
 
 	return transactions, nil
 }
+
+func (m *mysqlConnector) GetValidTransactionsForDebitor(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+	var transactions []entities.Transaction
+
+	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	res := m.db.WithContext(tCtx).
+		Where(&entities.Transaction{
+			DebitorID:         debitorID,
+			TransactionStatus: entities.TransactionStatusValid,
+		}).Find(&transactions)
+
+	if res.Error != nil {
+		return nil, res.Error
+	}
+
+	return transactions, nil
+}
+
+func (m *mysqlConnector) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
+	//SELECT COALESCE(SUM(p.gross_cent),0) - (SELECT COALESCE(SUM(psub.gross_cent),0) FROM pay_transactions psub WHERE psub.debitor_id = 1 AND psub.transaction_type = "payment" AND psub.transaction_status IN ("tentative", "valid")) FROM pay_transactions p WHERE p.debitor_id = 1 AND p.transaction_type = "due" AND p.transaction_status = "valid"
+
+	// TODO Continue here
+	return 0, nil
+}

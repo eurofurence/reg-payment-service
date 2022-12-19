@@ -28,6 +28,12 @@ import (
 
 var errHelpRequested = errors.New("help text was requested")
 
+var (
+	showHelp       bool
+	migrate        bool
+	configFilePath string
+)
+
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	logger := logging.NewLogger()
@@ -56,8 +62,10 @@ func main() {
 		}
 	})
 
-	if err := repo.Migrate(); err != nil {
-		logger.Fatal("%v", err)
+	if migrate {
+		if err := repo.Migrate(); err != nil {
+			logger.Fatal("%v", err)
+		}
 	}
 
 	//playDatabase(ctx, repo)
@@ -100,11 +108,9 @@ func main() {
 }
 
 func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) {
-	var showHelp, migrate bool
-	var configFilePath string
 
 	// TODO parse flags into variable that is available to the main function.
-	// Extrat the flags logic into different function.
+	// Extract the flags logic into different function.
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configFilePath, "config", "", "The path to a configuration file")
 	flag.BoolVar(&migrate, "migrate", false, "Performs database migrations before the service starts")

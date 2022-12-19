@@ -39,6 +39,8 @@ const (
 	AuthForbiddenMessage APIErrorMessage = "auth.forbidden"
 	// Request could not be parsed properly
 	RequestParseErrorMessage APIErrorMessage = "request.parse.failed"
+	// Request created a conflict
+	RequestConflictMessage APIErrorMessage = "request.conflict"
 	// Unknown error
 	UnknownErrorMessage APIErrorMessage = "http.error.unkonwn"
 )

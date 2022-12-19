@@ -60,3 +60,18 @@ func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query en
 	}
 	return result, nil
 }
+
+func (m *inmemoryProvider) GetValidTransactionsForDebitor(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
+	result := make([]entities.Transaction, 0)
+	for _, t := range m.transactions {
+		if t.DebitorID == debitorID && t.TransactionStatus == entities.TransactionStatusValid {
+			result = append(result, t)
+		}
+	}
+
+	return result, nil
+}
+
+func (m *inmemoryProvider) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
+	panic("not implemented") // TODO: Implement
+}
