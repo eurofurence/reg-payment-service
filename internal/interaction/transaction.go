@@ -5,11 +5,13 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 )
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
@@ -17,46 +19,111 @@ func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query
 }
 
 func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error) {
+	appConfig, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	// check if currency is allowed
+	if !isCurrencyAllowed(appConfig.Service.AllowedCurrencies, tran.Amount.ISOCurrency) {
+		return nil, apierrors.NewForbidden(fmt.Sprintf("invalid currency %s provided", tran.Amount.ISOCurrency))
+	}
+
+	// generate a transaction ID if none exists
+	if tran.TransactionID == "" {
+		id, err := generateTransactionID(appConfig.Service.TransactionIDPrefix, tran)
+		if err != nil {
+			return nil, err
+		}
+
+		tran.TransactionID = id
+	}
+
 	mgr := NewIdentityManager(ctx)
 	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
-		if tran.TransactionID == "" {
-			id, err := generateTransactionID(tran)
-			if err != nil {
-				return nil, err
-			}
-
-			tran.TransactionID = id
-		}
-
-		err := s.store.CreateTransaction(ctx, *tran)
-		if tran.TransactionType == entities.TransactionTypePayment {
-			err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID))
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		return tran, err
+		return s.createTransactionWithElevatedAccess(ctx, tran, mgr)
 	}
 
 	if mgr.IsRegisteredUser() {
+		// check if attendee is permitted to create this transaction
 		if err := s.validateAttendeeTransaction(ctx, tran); err != nil {
 			return nil, err
 		}
 
+		// generate a payment link
+		paymentLink, err := s.createPaymentLink(ctx, *tran)
+
+		if err != nil {
+			return nil, apierrors.NewInternalServerError(err.Error())
+		}
+
+		tran.PaymentStartUrl = paymentLink
+		// What do we do with response.ReferenceId?
+
+		// create a transaction in the database
 		if err := s.store.CreateTransaction(ctx, *tran); err != nil {
 			return nil, err
 		}
 
+		// inform the attendee service that there is a new payment in the database
 		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
 			return nil, err
 		}
 
 		return tran, nil
-
 	}
 
 	return nil, apierrors.NewForbidden("unable to determine the request permissions")
+}
+
+func (s *serviceInteractor) createTransactionWithElevatedAccess(
+	ctx context.Context,
+	tran *entities.Transaction,
+	mgr *IdentityManager) (*entities.Transaction, error) {
+
+	if mgr.IsAdmin() && tran.TransactionType == entities.TransactionTypeDue {
+		return nil, apierrors.NewForbidden("Admin role is not allowed to create transactions of type due")
+	}
+
+	if tran.TransactionType == entities.TransactionTypePayment {
+		pending, err := s.arePendingPaymentsPresent(ctx, tran.DebitorID)
+		if err != nil {
+			return nil, err
+		}
+		if pending {
+			return nil, apierrors.NewConflict(fmt.Sprintf("There are pending payments for attendee %d", tran.DebitorID))
+		}
+
+		// create payment link if
+		// transaction_type=payment, method=credit, status=tentative
+		if tran.TransactionType == entities.TransactionTypePayment &&
+			tran.PaymentMethod == entities.PaymentMethodCredit &&
+			tran.TransactionStatus == entities.TransactionStatusTentative {
+
+			paymentLink, err := s.createPaymentLink(ctx, *tran)
+			if err != nil {
+				return nil, apierrors.NewInternalServerError(err.Error())
+			}
+
+			tran.PaymentStartUrl = paymentLink
+		}
+
+		err = s.store.CreateTransaction(ctx, *tran)
+		if err != nil {
+			return nil, err
+		}
+
+		err = s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID))
+		if err != nil {
+			return nil, err
+		}
+
+		return tran, nil
+	} else {
+		// create new due transaction
+		err := s.store.CreateTransaction(ctx, *tran)
+		return tran, err
+	}
 }
 
 func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, newTransaction *entities.Transaction) error {
@@ -80,9 +147,20 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 		return apierrors.NewForbidden("transaction is not in a valid state")
 	}
 
+	// Check if there are any pending transactions.
+	pending, err := s.arePendingPaymentsPresent(ctx, newTransaction.DebitorID)
+
+	if err != nil {
+		s.logger.Error("could not retrieve pending payments for debitor %d - [error]: %v", newTransaction.DebitorID, err)
+		return err
+	}
+
+	// do not create a new transaction if there is a pending payment.
+	if pending {
+		return apierrors.NewConflict(fmt.Sprintf("There are pending payments for attendee %d", newTransaction.DebitorID))
+	}
+
 	// We defined, that we only query transactions in status valid.
-	// What if we have tentative transactions of type payment here?
-	// Then we would create transactions, where we exceed the due amount.
 	currentTransactions, err := s.store.GetValidTransactionsForDebitor(ctx, newTransaction.DebitorID)
 	if err != nil {
 		return err
@@ -107,14 +185,10 @@ func containsDebitor(debIDs []int64, debID int64) bool {
 	return false
 }
 
-func generateTransactionID(tran *entities.Transaction) (string, error) {
-	appConfig, err := config.GetApplicationConfig()
-	if err != nil {
-		return "", err
-	}
+func generateTransactionID(prefix string, tran *entities.Transaction) (string, error) {
 
 	parsedTime := time.Now().UTC().Format("0102-150405")
-	return fmt.Sprintf("%s-%06d-%s-%s", appConfig.Service.TransactionIDPrefix, tran.DebitorID, parsedTime, randomDigits(4)), nil
+	return fmt.Sprintf("%s-%06d-%s-%s", prefix, tran.DebitorID, parsedTime, randomDigits(4)), nil
 
 }
 
@@ -138,6 +212,27 @@ func randomDigits(count int) string {
 	}
 
 	return string(res)
+}
+
+func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debitorID int64) (bool, error) {
+	transactions, err := s.store.GetTransactionsByFilter(ctx, entities.TransactionQuery{DebitorID: debitorID})
+	if err != nil {
+		return false, err
+	}
+
+	// check if there are any existing transactions of type payment, and return if they are
+	// in pending or tentative state
+	for _, tt := range transactions {
+		switch tt.TransactionStatus {
+		case entities.TransactionStatusPending, entities.TransactionStatusTentative:
+			if tt.TransactionType == entities.TransactionTypePayment {
+				return true, nil
+			}
+		}
+	}
+
+	// no pending payment transactions
+	return false, nil
 }
 
 func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transaction, newTran *entities.Transaction) bool {
@@ -179,4 +274,29 @@ func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transactio
 	}
 
 	return true
+}
+
+func (s *serviceInteractor) createPaymentLink(ctx context.Context, tran entities.Transaction) (string, error) {
+	response, err := s.cncrdClient.CreatePaylink(ctx, cncrdadapter.PaymentLinkRequestDto{
+		DebitorId: tran.DebitorID,
+		Currency:  tran.Amount.ISOCurrency,
+		VatRate:   tran.Amount.VatRate,
+		AmountDue: tran.Amount.GrossCent,
+	})
+
+	if err != nil {
+		return "", apierrors.NewInternalServerError(err.Error())
+	}
+
+	return response.Link, nil
+}
+
+func isCurrencyAllowed(allowedCurrencies []string, isoCurrency string) bool {
+	for _, cur := range allowedCurrencies {
+		if strings.EqualFold(cur, isoCurrency) {
+			return true
+		}
+	}
+
+	return false
 }

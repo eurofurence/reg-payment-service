@@ -41,6 +41,8 @@ const (
 	RequestParseErrorMessage APIErrorMessage = "request.parse.failed"
 	// Request created a conflict
 	RequestConflictMessage APIErrorMessage = "request.conflict"
+	// Internal error
+	InternalErrorMessage APIErrorMessage = "http.error.internal"
 	// Unknown error
 	UnknownErrorMessage APIErrorMessage = "http.error.unkonwn"
 )

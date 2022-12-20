@@ -64,8 +64,8 @@ func SendConflictResponse(w http.ResponseWriter, reqID string, logger logging.Lo
 	SendResponseWithStatusAndMessage(w, http.StatusConflict, reqID, RequestConflictMessage, logger, details)
 }
 
-func SendInternalServerError(w http.ResponseWriter, reqID string, message APIErrorMessage, logger logging.Logger, details string) {
-	SendResponseWithStatusAndMessage(w, http.StatusInternalServerError, reqID, message, logger, details)
+func SendInternalServerError(w http.ResponseWriter, reqID string, logger logging.Logger, details string) {
+	SendResponseWithStatusAndMessage(w, http.StatusInternalServerError, reqID, InternalErrorMessage, logger, details)
 }
 
 func SendResponseWithStatusAndMessage(w http.ResponseWriter, status int, reqID string, message APIErrorMessage, logger logging.Logger, details string) {

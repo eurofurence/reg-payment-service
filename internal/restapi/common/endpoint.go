@@ -29,13 +29,13 @@ func CreateHandler[Req, Res any](endpoint Endpoint[Req, Res],
 
 		if requestHandler == nil {
 			logger.Error("No request handler supplied")
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
+			SendInternalServerError(w, reqID, logger, "")
 			return
 		}
 
 		if responseHandler == nil {
 			logger.Error("No response handler supplied")
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
+			SendInternalServerError(w, reqID, logger, "")
 			return
 		}
 
@@ -69,7 +69,6 @@ func CreateHandler[Req, Res any](endpoint Endpoint[Req, Res],
 				case apierrors.IsInternalServerError(err):
 					SendInternalServerError(w,
 						reqID,
-						APIErrorMessage(status.Status().Message),
 						logger,
 						status.Status().Details,
 					)
@@ -78,13 +77,16 @@ func CreateHandler[Req, Res any](endpoint Endpoint[Req, Res],
 				return
 			}
 
-			SendInternalServerError(w, reqID, APIErrorMessage(err.Error()), logger, "")
+			// do not propagate internal errors to the client.
+			// check the logs for errors - and use metrics later on
+			logger.Error("Service reported internal error: [error]: %v", err)
+			SendInternalServerError(w, reqID, logger, "")
 			return
 		}
 
 		if err := responseHandler(ctx, response, w); err != nil {
 			logger.Error("An error occurred during the handling of the response. [error]: %v", err)
-			SendInternalServerError(w, reqID, UnknownErrorMessage, logger, "")
+			SendInternalServerError(w, reqID, logger, "")
 			return
 		}
 
