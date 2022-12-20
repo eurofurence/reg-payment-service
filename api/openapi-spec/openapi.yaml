@@ -157,6 +157,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        '409':
+          description: This debitor already has an open payment link, please use that one (or delete it first)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '500':
           description: An unexpected error occurred. A reasonable effort is made to return error information, but there are situations where this will not work
           content:
