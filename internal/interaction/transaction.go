@@ -50,6 +50,11 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 			return nil, err
 		}
 
+		// TODO new order
+		// 1. create transaction
+		// 2. create paymentlink
+		// 3. update transaction with paymentlink
+
 		// generate a payment link
 		paymentLink, err := s.createPaymentLink(ctx, *tran)
 
@@ -93,6 +98,11 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 		if pending {
 			return nil, apierrors.NewConflict(fmt.Sprintf("There are pending payments for attendee %d", tran.DebitorID))
 		}
+
+		// TODO new order
+		// 1. create transaction
+		// 2. create paymentlink
+		// 3. update transaction with paymentlink
 
 		// create payment link if
 		// transaction_type=payment, method=credit, status=tentative
