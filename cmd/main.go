@@ -4,17 +4,19 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
-	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"net/http"
 	"path/filepath"
 
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
-	"github.com/eurofurence/reg-payment-service/internal/domain"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/mysql"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 	"github.com/eurofurence/reg-payment-service/internal/server"
 
 	"context"
@@ -25,6 +27,12 @@ import (
 )
 
 var errHelpRequested = errors.New("help text was requested")
+
+var (
+	showHelp       bool
+	migrate        bool
+	configFilePath string
+)
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -54,14 +62,24 @@ func main() {
 		}
 	})
 
-	if err := repo.Migrate(); err != nil {
-		logger.Fatal("%v", err)
+	if migrate {
+		if err := repo.Migrate(); err != nil {
+			logger.Fatal("%v", err)
+		}
 	}
 
-	playDatabase(ctx, repo)
+	//playDatabase(ctx, repo)
+
+	attClient := constructOrFail(ctx, logger, func() (attendeeservice.AttendeeService, error) {
+		return attendeeservice.New(conf.Service.AttendeeService, conf.Security.Fixed.Api)
+	})
+
+	ccClient := constructOrFail(ctx, logger, func() (cncrdadapter.CncrdAdapter, error) {
+		return cncrdadapter.New(conf.Service.ProviderAdapter, conf.Security.Fixed.Api)
+	})
 
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo, logger)
+		return interaction.NewServiceInteractor(repo, attClient, ccClient, logger)
 	})
 
 	logger.Debug("Setting up router")
@@ -90,11 +108,9 @@ func main() {
 }
 
 func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) {
-	var showHelp, migrate bool
-	var configFilePath string
 
 	// TODO parse flags into variable that is available to the main function.
-	// Extrat the flags logic into different function.
+	// Extract the flags logic into different function.
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configFilePath, "config", "", "The path to a configuration file")
 	flag.BoolVar(&migrate, "migrate", false, "Performs database migrations before the service starts")
@@ -164,7 +180,7 @@ func playDatabase(ctx context.Context, r database.Repository) {
 		dt := defaultTransaction()
 
 		dt.Comment = "Hello1"
-		dt.TransactionStatusID = uint(domain.Valid)
+		dt.TransactionStatus = entities.TransactionStatusValid
 		dt.DebitorID = 1
 		err = testUpdateTransaction(ctx, r, dt)
 		if err != nil {
@@ -184,28 +200,24 @@ func testUpdateTransaction(ctx context.Context, r database.Repository, tr entiti
 }
 
 func defaultTransaction() entities.Transaction {
+	ti, _ := time.Parse("2006-01-02", "2022-12-30")
+
 	return entities.Transaction{
-		TransactionID:     "123456789",
-		DebitorID:         1,
-		TransactionTypeID: uint(domain.Due),
-		TransactionType: entities.TransactionType{
-			Description: "Due",
-		},
-		PaymentMethodID: uint(domain.Credit),
-		PaymentMethod: entities.PaymentMethod{
-			Description: "Credit",
-		},
-		TransactionStatusID: uint(domain.Pending),
-		TransactionStatus: entities.TransactionStatus{
-			Description: "Pending",
-		},
+		TransactionID:     "234567895",
+		DebitorID:         2,
+		TransactionType:   entities.TransactionTypeDue,
+		PaymentMethod:     entities.PaymentMethodCredit,
+		TransactionStatus: entities.TransactionStatusPending,
 		Amount: entities.Amount{
 			ISOCurrency: "EUR",
 			GrossCent:   19000,
 			VatRate:     19.0,
 		},
-		Comment:       "Payment Noroth",
-		EffectiveDate: sql.NullTime{},
-		DueDate:       sql.NullTime{},
+		Comment: "Payment Noroth",
+		EffectiveDate: sql.NullTime{
+			Valid: true,
+			Time:  ti,
+		},
+		DueDate: sql.NullTime{},
 	}
 }

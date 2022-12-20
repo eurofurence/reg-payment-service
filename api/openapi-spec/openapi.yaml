@@ -16,9 +16,9 @@ info:
     url: https://github.com/eurofurence/reg-payment-service/LICENSE
   version: 1.0.0
 servers:
-  - url: /
+  - url: /api/rest
     description: localhost
-  - url: /paysrv
+  - url: /paysrv/api/rest
     description: server
 tags:
   - name: transactions
@@ -134,7 +134,7 @@ paths:
               schema:
                 type: string
               description: URL of the created resource, ending in the assigned transaction ID.
-              example: /v1/transactions/481
+              example: /v1/transactions/EF2023-000001-0210-123000-4711
           content:
             application/json:
               schema:
@@ -153,6 +153,12 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Request was forbidden (you do not have permission to create transactions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: This debitor already has an open payment link, please use that one (or delete it first)
           content:
             application/json:
               schema:
@@ -238,6 +244,78 @@ paths:
                 $ref: '#/components/schemas/Error'
         '403':
           description: Request was forbidden (you do not have permission to change transactions)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: An unexpected error occurred. A reasonable effort is made to return error information, but there are situations where this will not work
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      security:
+        - api_key: []
+        - bearer_auth: []
+  /v1/transactions/initiate-payment:
+    post:
+      tags:
+        - transactions
+      summary: Convenience endpoint for creating a payment via payment-link for all outstanding dues
+      description: |-
+        This endpoint adds a new transaction with
+          transaction_type=payment, method=credit, status=tentative
+        for the currently outstanding amount, and then a payment link is created and the transaction is saved
+        including the payment link and its id.
+
+        This endpoint returns the created transaction so you get access to the payment link.
+      operationId: initiatePaylinkTransaction
+      requestBody:
+        description: A transaction object to perform an operation according to the data provided
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionInitiator'
+      responses:
+        '201':
+          description: Successfully created
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL of the created resource, ending in the assigned transaction ID.
+              example: /v1/transactions/481
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          description: Request validation failed, or the current dues balance for this debitor is 0
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          description: Request was unauthorized (wrong or no api token, invalid, expired or no bearer token)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '403':
+          description: Request was forbidden (you do not have permission to create transactions for this debitor)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: No dues transactions for this debitor id exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: This debitor already has an open payment link, please use that one
           content:
             application/json:
               schema:
@@ -344,8 +422,16 @@ components:
           type: string
           format: date-time
           example: '2022-06-24T11:12:13Z'
-        status_history:
-          $ref: '#/components/schemas/StatusHistory'
+    TransactionInitiator:
+      type: object
+      required:
+        - debitor_id
+      properties:
+        debitor_id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: the debitor the transaction concerns (the badge id)
     Amount:
       type: object
       required:
@@ -372,26 +458,6 @@ components:
           format: double
           description: VAT rate in percent. The example value means 7.7% VAT.
           example: 7.7
-    StatusHistory:
-      description: the history of status changes for this transaction. Only visible to admins.
-      type: array
-      items:
-        type: object
-        required:
-          - status
-          - change_date
-        properties:
-          status:
-            $ref: '#/components/schemas/TransactionStatus'
-          comment:
-            type: string
-            description: optional comment why the change was made
-          changed_by:
-            type: string
-            description: the subject from the JWT (that is, the user id from the identity provider)
-          change_date:
-            type: string
-            format: date-time
     TransactionStatus:
       type: string
       example: valid
@@ -445,6 +511,7 @@ components:
             - transaction.data.invalid (field data failed to validate, see details field for more information)
             - transaction.data.duplicate (duplicate referenceId)            
             - transaction.write.error (database error)
+            - transaction.read.error (database error)
             - transaction.paylink.error (adapter failure while creating payment link)            
             - transaction.id.notfound (no such transaction in the database)
             - transaction.id.invalid (syntactically invalid transaction id, must be positive integer)
@@ -469,7 +536,7 @@ components:
   securitySchemes:
     api_key:
       type: apiKey
-      name: X-API-TOKEN
+      name: X-Api-Key
       in: header
     bearer_auth:
       type: http

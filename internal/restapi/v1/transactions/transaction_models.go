@@ -1,59 +1,14 @@
 package v1transactions
 
-import "time"
+import (
+	"time"
 
-type TransactionType string
-
-const (
-	TransactionTypeDue      TransactionType = "due"
-	TransactionTypePayement TransactionType = "payment"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-func (t TransactionType) IsValid() bool {
-	switch t {
-	case TransactionTypeDue, TransactionTypePayement:
-		return true
-	}
+type InitiatePaymentRequest struct{}
 
-	return false
-}
-
-type PaymentMethod string
-
-const (
-	PaymentMethodCredit   PaymentMethod = "credit"
-	PaymentMethodPaypal   PaymentMethod = "paypal"
-	PaymentMethodTransfer PaymentMethod = "transfer"
-	PaymentMethodInternal PaymentMethod = "internal"
-	PaymentMethodGift     PaymentMethod = "gift"
-)
-
-func (p PaymentMethod) IsValid() bool {
-	switch p {
-	case PaymentMethodCredit, PaymentMethodPaypal, PaymentMethodTransfer, PaymentMethodInternal, PaymentMethodGift:
-		return true
-	}
-
-	return false
-}
-
-type TransactionStatus string
-
-const (
-	TransactionStatusTentative TransactionStatus = "tentative"
-	TransactionStatusPending   TransactionStatus = "pending"
-	TransactionStatusValid     TransactionStatus = "valid"
-	TransactionStatusDeleted   TransactionStatus = "deleted"
-)
-
-func (t TransactionStatus) IsValid() bool {
-	switch t {
-	case TransactionStatusTentative, TransactionStatusPending, TransactionStatusValid, TransactionStatusDeleted:
-		return true
-	}
-
-	return false
-}
+type InitiatePaymentResponse struct{}
 
 // GetTransactionsRequest will contain all information that will be sent from the
 // client during calling the GetTransactions endpoint
@@ -84,10 +39,10 @@ type Amount struct {
 type PaymentProcessorInformation map[string]interface{}
 
 type StatusHistory struct {
-	Status     TransactionStatus `json:"status"`
-	Comment    string            `json:"comment"`
-	ChangedBy  string            `json:"changed_by"`
-	ChangeDate time.Time         `json:"change_date"`
+	Status     entities.TransactionStatus `json:"status"`
+	Comment    string                     `json:"comment"`
+	ChangedBy  string                     `json:"changed_by"`
+	ChangeDate time.Time                  `json:"change_date"`
 }
 
 // CreateTrasactionRequest contains all information to create a new transaction for a given debitor
@@ -96,24 +51,27 @@ type CreateTransactionRequest struct {
 }
 
 type CreateTransactionResponse struct {
+	Transaction Transaction `json:"transaction"`
 }
 
-type UpdateTransactionRequest struct{}
+type UpdateTransactionRequest struct {
+	Transaction Transaction `json:"transaction"`
+}
 
 type UpdateTransactionResponse struct{}
 
 type Transaction struct {
 	DebitorID             int64                       `json:"debitor_id"`
 	TransactionIdentifier string                      `json:"transaction_identifier"`
-	TransactionType       TransactionType             `json:"transaciont_type"`
-	Method                PaymentMethod               `json:"method"`
+	TransactionType       entities.TransactionType    `json:"transaction_type"`
+	Method                entities.PaymentMethod      `json:"method"`
 	Amount                Amount                      `json:"amount"`
 	Comment               string                      `json:"comment"`
-	Status                TransactionStatus           `json:"status"`
+	Status                entities.TransactionStatus  `json:"status"`
 	Info                  PaymentProcessorInformation `json:"payment_processor_information"`
 	PaymentStartUrl       string                      `json:"payment_start_url"`
-	EffectiveDate         time.Time                   `json:"effective_date"`
-	DueDate               time.Time                   `json:"due_date"`
-	CreationDate          time.Time                   `json:"creation_date"`
+	EffectiveDate         string                      `json:"effective_date"`
+	DueDate               string                      `json:"due_date,omitempty"`
+	CreationDate          *time.Time                  `json:"creation_date,omitempty"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
 }

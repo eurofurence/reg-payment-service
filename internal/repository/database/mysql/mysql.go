@@ -6,13 +6,15 @@ import (
 	"sync"
 	"time"
 
+	"gorm.io/gorm/schema"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
+	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
-	"github.com/eurofurence/reg-payment-service/internal/repository/entities"
 )
 
 type mysqlConnector struct {
@@ -27,7 +29,12 @@ func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (datab
 		return nil, err
 	}
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	gormConfig := gorm.Config{
+		NamingStrategy: schema.NamingStrategy{
+			TablePrefix: "pay_",
+		},
+	}
+	db, err := gorm.Open(mysql.Open(dsn), &gormConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -51,9 +58,6 @@ func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (datab
 
 func (i *mysqlConnector) Migrate() error {
 	err := i.db.AutoMigrate(
-		&entities.TransactionType{},
-		&entities.PaymentMethod{},
-		&entities.TransactionStatus{},
 		&entities.Transaction{},
 		&entities.TransactionLog{},
 	)
@@ -62,28 +66,7 @@ func (i *mysqlConnector) Migrate() error {
 		return err
 	}
 
-	i.populateStates()
-
 	return nil
-}
-
-func (i *mysqlConnector) populateStates() {
-	// Transaction Types
-	i.db.FirstOrCreate(&entities.TransactionType{ID: 0, Description: "Due"})
-	i.db.FirstOrCreate(&entities.TransactionType{ID: 1, Description: "Payment"})
-
-	// Payment Methods
-	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 0, Description: "Credit"})
-	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 1, Description: "Paypal"})
-	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 2, Description: "Transfer"})
-	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 3, Description: "Internal"})
-	i.db.FirstOrCreate(&entities.PaymentMethod{ID: 4, Description: "Gift"})
-
-	// Transaction States
-	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 0, Description: "Pending"})
-	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 1, Description: "Tentative"})
-	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 2, Description: "Valid"})
-	i.db.FirstOrCreate(&entities.TransactionStatus{ID: 3, Description: "Deleted"})
 }
 
 func buildMySQLDSN(username, password, database string, parameters []string) (string, error) {

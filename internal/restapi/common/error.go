@@ -23,6 +23,8 @@ const (
 	TransactionDataDuplicateMessage APIErrorMessage = "transaction.data.duplicate"
 	// database error
 	TransactionWriteErrorMessage APIErrorMessage = "transaction.write.error"
+	// database error
+	TransactionReadErrorMessage APIErrorMessage = "transaction.read.error"
 	// adapter failure while creating payment link
 	TransactionPaylingErrorMessage APIErrorMessage = "transaction.paylink.error"
 	// no such transaction in the database
@@ -37,6 +39,10 @@ const (
 	AuthForbiddenMessage APIErrorMessage = "auth.forbidden"
 	// Request could not be parsed properly
 	RequestParseErrorMessage APIErrorMessage = "request.parse.failed"
+	// Request created a conflict
+	RequestConflictMessage APIErrorMessage = "request.conflict"
+	// Internal error
+	InternalErrorMessage APIErrorMessage = "http.error.internal"
 	// Unknown error
 	UnknownErrorMessage APIErrorMessage = "http.error.unkonwn"
 )
