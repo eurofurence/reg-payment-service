@@ -4,9 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
+
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
 func TestNewIdentityManager(t *testing.T) {

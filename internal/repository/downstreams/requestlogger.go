@@ -2,9 +2,11 @@ package downstreams
 
 import (
 	"context"
-	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"time"
+
+	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
 // custom implementation because this service isn't using go-autumn-logging

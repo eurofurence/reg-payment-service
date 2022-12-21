@@ -196,7 +196,7 @@ func testCreateTransaction(ctx context.Context, r database.Repository) error {
 }
 
 func testUpdateTransaction(ctx context.Context, r database.Repository, tr entities.Transaction) error {
-	return r.UpdateTransaction(ctx, tr)
+	return r.UpdateTransaction(ctx, tr, false)
 }
 
 func defaultTransaction() entities.Transaction {

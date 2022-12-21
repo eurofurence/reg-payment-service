@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
-	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams"
 	"net/http"
+
+	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
+
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams"
 )
 
 type Impl struct {

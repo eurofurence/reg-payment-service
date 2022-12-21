@@ -1,6 +1,9 @@
 package v1transactions
 
 import (
+	"database/sql"
+	"time"
+
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
@@ -32,4 +35,61 @@ func ToV1Transaction(tran entities.Transaction) Transaction {
 
 	return result
 
+}
+
+func ToTransactionEntity(tr Transaction) (*entities.Transaction, error) {
+	effDate, err := parseEffectiveDate(tr.EffectiveDate)
+	if err != nil {
+		return nil, err
+	}
+
+	tran := &entities.Transaction{
+		DebitorID:         tr.DebitorID,
+		TransactionID:     tr.TransactionIdentifier,
+		TransactionType:   tr.TransactionType,
+		PaymentMethod:     tr.Method,
+		PaymentStartUrl:   tr.PaymentStartUrl,
+		TransactionStatus: tr.Status,
+		Amount: entities.Amount{
+			ISOCurrency: tr.Amount.Currency,
+			GrossCent:   tr.Amount.GrossCent,
+			VatRate:     tr.Amount.VatRate,
+		},
+		Comment: tr.Comment,
+		EffectiveDate: sql.NullTime{
+			Valid: true,
+			Time:  effDate,
+		},
+	}
+
+	if tr.DueDate != "" {
+		dueDate, err := parseEffectiveDate(tr.DueDate)
+		if err != nil {
+			return nil, err
+		}
+
+		tran.DueDate = sql.NullTime{
+			Valid: true,
+			Time:  dueDate,
+		}
+	}
+
+	return tran, nil
+}
+
+// Effective dates are only valid for an exact day without time.
+// We will parse them in the ISO 8601 (yyyy-mm-dd) format without time
+//
+// If `effDate` is emty, we will return a zero time instead
+func parseEffectiveDate(effDate string) (time.Time, error) {
+	if effDate != "" {
+		parsed, err := time.Parse("2006-01-02", effDate)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		return parsed, nil
+	}
+
+	return time.Time{}, nil
 }

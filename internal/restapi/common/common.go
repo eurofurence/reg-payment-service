@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 )
 
 type (

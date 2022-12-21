@@ -3,7 +3,6 @@ package mysql
 import (
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	"gorm.io/gorm/schema"
@@ -18,7 +17,6 @@ import (
 )
 
 type mysqlConnector struct {
-	lock   sync.RWMutex
 	logger logging.Logger
 	db     *gorm.DB
 }
@@ -49,7 +47,6 @@ func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (datab
 	sqlDB.SetConnMaxLifetime(time.Minute * 10)
 
 	return &mysqlConnector{
-		lock:   sync.RWMutex{},
 		logger: logger,
 		db:     db,
 	}, nil

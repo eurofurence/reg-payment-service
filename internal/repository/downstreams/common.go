@@ -3,13 +3,15 @@ package downstreams
 import (
 	"context"
 	"errors"
+	"net/http"
+	"time"
+
 	aurestbreaker "github.com/StephanHCB/go-autumn-restclient-circuitbreaker/implementation/breaker"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
 	auresthttpclient "github.com/StephanHCB/go-autumn-restclient/implementation/httpclient"
-	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/go-http-utils/headers"
-	"net/http"
-	"time"
+
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
 const apiKeyHeader = "X-Api-Key"

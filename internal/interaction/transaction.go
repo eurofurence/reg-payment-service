@@ -5,12 +5,14 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 )
 
@@ -19,6 +21,7 @@ func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query
 }
 
 func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error) {
+	logger := logging.LoggerFromContext(ctx)
 	appConfig, err := config.GetApplicationConfig()
 	if err != nil {
 		return nil, err
@@ -72,7 +75,7 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 		// inform the attendee service that there is a new payment in the database
 		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
-			return nil, err
+			logger.Error("error when calling the attendee service webhook. [error]: %v", err)
 		}
 
 		return tran, nil
@@ -81,10 +84,79 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 	return nil, apierrors.NewForbidden("unable to determine the request permissions")
 }
 
+func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
+	mgr := NewIdentityManager(ctx)
+
+	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {
+		return apierrors.NewForbidden("no permission to update transaction")
+	}
+
+	res, err := s.store.GetTransactionsByFilter(ctx, entities.TransactionQuery{
+		DebitorID:             tran.DebitorID,
+		TransactionIdentifier: tran.TransactionID,
+	})
+
+	if err != nil {
+		return err
+	}
+
+	if len(res) == 0 {
+		return apierrors.NewNotFound(
+			fmt.Sprintf("transaction %s for debitor %d could not be found", tran.TransactionID, tran.DebitorID),
+		)
+	}
+
+	curTran := res[0]
+
+	// check if transaction should be deleted or not
+	if !reflect.ValueOf(tran.Deletion).IsZero() {
+		// Within 3 calendar days of creation, for any transaction an admin may change
+		// - status -> deleted
+		const maxDaysForDeletion = 3.0
+		days := time.Now().UTC().Sub(curTran.CreatedAt.UTC()).Hours() / 24.0
+
+		if days > maxDaysForDeletion {
+			return apierrors.NewForbidden("")
+		}
+
+		// update the deletion status with the current status that was
+		// TODO move logic to database
+		tran.Deletion.Status = curTran.TransactionStatus
+		tran.TransactionStatus = entities.TransactionStatusDeleted
+
+		return s.store.DeleteTransaction(ctx, *tran)
+	}
+
+	if tran.TransactionType == entities.TransactionTypeDue {
+		return apierrors.NewForbidden("cannot change the transaction of type due")
+	}
+
+	requireHistorization := false
+
+	// Status changes:
+	//    (The previous status is always historized, see the history field)
+	if tran.TransactionStatus != curTran.TransactionStatus {
+		if !isValidStatusChange(curTran, *tran) {
+			return apierrors.NewForbidden(
+				fmt.Sprintf("cannot change status from %s to %s for transaction %s",
+					curTran.TransactionStatus,
+					tran.TransactionStatus,
+					tran.TransactionID,
+				))
+		}
+
+		requireHistorization = true
+	}
+
+	return s.store.UpdateTransaction(ctx, *tran, requireHistorization)
+}
+
 func (s *serviceInteractor) createTransactionWithElevatedAccess(
 	ctx context.Context,
 	tran *entities.Transaction,
 	mgr *IdentityManager) (*entities.Transaction, error) {
+
+	logger := logging.LoggerFromContext(ctx)
 
 	if mgr.IsAdmin() && tran.TransactionType == entities.TransactionTypeDue {
 		return nil, apierrors.NewForbidden("Admin role is not allowed to create transactions of type due")
@@ -99,16 +171,16 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 			return nil, apierrors.NewConflict(fmt.Sprintf("There are pending payments for attendee %d", tran.DebitorID))
 		}
 
-		// TODO new order
-		// 1. create transaction
-		// 2. create paymentlink
-		// 3. update transaction with paymentlink
+		// We first make sure that we successfully persisted the transaction
+		// in the DB before requesting a payment link if applicable
+		err = s.store.CreateTransaction(ctx, *tran)
+		if err != nil {
+			return nil, err
+		}
 
 		// create payment link if
 		// transaction_type=payment, method=credit, status=tentative
-		if tran.TransactionType == entities.TransactionTypePayment &&
-			tran.PaymentMethod == entities.PaymentMethodCredit &&
-			tran.TransactionStatus == entities.TransactionStatusTentative {
+		if shouldRequestPaymentLink(tran) {
 
 			paymentLink, err := s.createPaymentLink(ctx, *tran)
 			if err != nil {
@@ -116,27 +188,31 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 			}
 
 			tran.PaymentStartUrl = paymentLink
+
+			// update the transaction and insert the payment link,
+			// which was provided by the adapter service
+			if err := s.store.UpdateTransaction(ctx, *tran, true); err != nil {
+				return nil, err
+			}
 		}
 
-		err = s.store.CreateTransaction(ctx, *tran)
-		if err != nil {
-			return nil, err
-		}
-
-		err = s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID))
-		if err != nil {
-			return nil, err
+		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
+			// If the webhook was not successful, we write an error log and do not
+			// return a 500 error response
+			logger.Error("error when calling attendee service webhook. [error]: %v", err)
 		}
 
 		return tran, nil
 	} else {
-		// create new due transaction
+		// create new due transaction - must be created in status valid
+		tran.TransactionStatus = entities.TransactionStatusValid
 		err := s.store.CreateTransaction(ctx, *tran)
 		return tran, err
 	}
 }
 
 func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, newTransaction *entities.Transaction) error {
+	logger := logging.LoggerFromContext(ctx)
 	debitorIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
 	if err != nil {
 		return err
@@ -146,22 +222,16 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 		return apierrors.NewForbidden(fmt.Sprintf("transactions for debitorID %d may not be altered", newTransaction.DebitorID))
 	}
 
-	if newTransaction.TransactionType != entities.TransactionTypePayment ||
-		newTransaction.TransactionStatus != entities.TransactionStatusTentative ||
-		newTransaction.PaymentMethod != entities.PaymentMethodCredit {
-
-		// only payment transactions
-		// only status tentative
-		// only method credit
-		// -> Status 403
-		return apierrors.NewForbidden("transaction is not in a valid state")
+	// User may only create transactions which are valid for requesting payment links
+	if !shouldRequestPaymentLink(newTransaction) {
+		return apierrors.NewForbidden("transaction is not eligible for requesting a payment link")
 	}
 
 	// Check if there are any pending transactions.
 	pending, err := s.arePendingPaymentsPresent(ctx, newTransaction.DebitorID)
 
 	if err != nil {
-		s.logger.Error("could not retrieve pending payments for debitor %d - [error]: %v", newTransaction.DebitorID, err)
+		logger.Error("could not retrieve pending payments for debitor %d - [error]: %v", newTransaction.DebitorID, err)
 		return err
 	}
 
@@ -178,7 +248,7 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 
 	// in error case: 400
 	// if partial payment || no outstanding dues
-	if !s.isValidPayment(currentTransactions, newTransaction) {
+	if !s.isValidPayment(currentTransactions, newTransaction, logger) {
 		return apierrors.NewBadRequest("no outstanding dues or partial payment")
 	}
 
@@ -245,17 +315,11 @@ func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debit
 	return false, nil
 }
 
-func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transaction, newTran *entities.Transaction) bool {
+func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transaction, newTran *entities.Transaction, logger logging.Logger) bool {
 	var allDues int64
 	var allPayments int64
 
 	for _, t := range curTransactions {
-		// Do we need a currency check here?
-		// if t.Amount.ISOCurrency != newTran.Amount.ISOCurrency {
-		//  s.logger.Error(...)
-		// 	return false
-		// }
-
 		if t.TransactionType == entities.TransactionTypeDue {
 			allDues += t.Amount.GrossCent
 		} else if t.TransactionType == entities.TransactionTypePayment {
@@ -270,7 +334,7 @@ func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transactio
 
 	// can we have negative dues if we owe an attendee money?
 	if allDues <= 0 {
-		s.logger.Info("No outstanding dues for attendee %d", newTran.DebitorID)
+		logger.Info("No outstanding dues for attendee %d", newTran.DebitorID)
 		return false
 	}
 
@@ -279,7 +343,7 @@ func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transactio
 	if remaining < 0 || newTran.Amount.GrossCent != remaining {
 		// we do not allow partial payments from attendees
 		// Admins or s2s calls will not use this validation logic
-		s.logger.Info("rejected partial payment for attendee %d", newTran.DebitorID)
+		logger.Info("rejected partial payment for attendee %d", newTran.DebitorID)
 		return false
 	}
 
@@ -309,4 +373,41 @@ func isCurrencyAllowed(allowedCurrencies []string, isoCurrency string) bool {
 	}
 
 	return false
+}
+
+func shouldRequestPaymentLink(tran *entities.Transaction) bool {
+	// Only the following condition is valid at the time,
+	// in order to generate a payment link
+	//
+	// transaction_type=payment, method=credit, status=tentative
+	return tran.TransactionType == entities.TransactionTypePayment &&
+		tran.PaymentMethod == entities.PaymentMethodCredit &&
+		tran.TransactionStatus == entities.TransactionStatusTentative
+}
+
+func isValidStatusChange(curTran, tran entities.Transaction) bool {
+	// The only possible change is status for payments
+	// * tentative -> pending (payment link has been used)
+	// * tentative -> deleted (payment link has been deleted)
+	// * pending -> valid (payment is confirmed by admin or by payment provider)
+	// * pending -> deleted (payment has been deemed in error)
+
+	if curTran.TransactionStatus == entities.TransactionStatusTentative {
+		switch tran.TransactionStatus {
+		case entities.TransactionStatusPending, entities.TransactionStatusDeleted:
+			return true
+		}
+
+		return false
+	}
+
+	if curTran.TransactionStatus == entities.TransactionStatusPending {
+		switch tran.TransactionStatus {
+		case entities.TransactionStatusValid, entities.TransactionStatusDeleted:
+			return true
+		}
+	}
+
+	return false
+
 }
