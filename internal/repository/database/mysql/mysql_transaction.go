@@ -4,12 +4,13 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"reflect"
 	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-var allowedFields = []string{"TransactionStatusID", "Comment", "Deletion", "EffectiveDate", "DueDate"}
+var allowedFields = []string{"PaymentStartUrl", "TransactionStatus", "DueDate", ""}
 
 var (
 	// ErrTransactionExists is returned when a transaction already exists in the database
@@ -20,20 +21,6 @@ func (m *mysqlConnector) CreateTransaction(ctx context.Context, tr entities.Tran
 	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
-	// Transactions of type due can only be created once.
-	// if tr.TransactionType == entities.TransactionTypeDue {
-	// 	var exists int64
-	// 	m.db.WithContext(tCtx).Model(&entities.Transaction{}).
-	// 		Where(&entities.Transaction{
-	// 			TransactionID:   tr.TransactionID,
-	// 			TransactionType: entities.TransactionTypeDue,
-	// 		}).
-	// 		Count(&exists)
-	// 	if exists > 0 {
-	// 		return ErrTransactionExists
-	// 	}
-	// }
-
 	result := m.db.WithContext(tCtx).Create(&tr)
 
 	if result.Error != nil {
@@ -43,14 +30,17 @@ func (m *mysqlConnector) CreateTransaction(ctx context.Context, tr entities.Tran
 	return m.CreateTransactionLog(ctx, tr.ToTransactionLog())
 }
 
-func (m *mysqlConnector) UpdateTransaction(ctx context.Context, tr entities.Transaction) error {
+func (m *mysqlConnector) UpdateTransaction(ctx context.Context, tr entities.Transaction, historize bool) error {
 	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
 	defer cancel()
 
 	res := m.db.WithContext(tCtx).
-		Model(&tr).
+		Model(&entities.Transaction{}).
 		Select(allowedFields).
-		Where(&entities.Transaction{TransactionID: tr.TransactionID}).
+		Where(&entities.Transaction{
+			DebitorID:     tr.DebitorID,
+			TransactionID: tr.TransactionID,
+		}).
 		Updates(tr)
 
 	if res.Error != nil {
@@ -67,7 +57,11 @@ func (m *mysqlConnector) UpdateTransaction(ctx context.Context, tr entities.Tran
 		return res.Error
 	}
 
-	return m.CreateTransactionLog(ctx, tr.ToTransactionLog())
+	if historize {
+		return m.CreateTransactionLog(ctx, tr.ToTransactionLog())
+	}
+
+	return nil
 }
 
 func (m *mysqlConnector) GetTransactionByTransactionIDAndType(ctx context.Context, transactionID string, tType entities.TransactionType) (*entities.Transaction, error) {
@@ -159,4 +153,38 @@ p.debitor_id = @debitorID AND p.transaction_type = "due" AND p.transaction_statu
 		Find(&amount)
 
 	return amount, res.Error
+}
+
+func (m *mysqlConnector) DeleteTransaction(ctx context.Context, tr entities.Transaction) error {
+	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	// Do we have to make sure that this information was provided?
+	if reflect.ValueOf(tr.Deletion).IsZero() {
+		return errors.New("no deletion information was provided. Transaction cannot be flagged as deleted without")
+	}
+
+	res := m.db.WithContext(tCtx).
+		Model(&entities.Transaction{}).
+		Select([]string{"DeletedAt", "Deletion"}).
+		Where(&entities.Transaction{
+			DebitorID:     tr.DebitorID,
+			TransactionID: tr.TransactionID,
+		}).Updates(tr)
+
+	if res.Error != nil {
+		return res.Error
+	}
+
+	res = m.db.WithContext(tCtx).
+		Where(&entities.Transaction{
+			TransactionID:   tr.TransactionID,
+			TransactionType: tr.TransactionType,
+		}).
+		First(&tr)
+	if res.Error != nil {
+		return res.Error
+	}
+
+	return m.CreateTransactionLog(ctx, tr.ToTransactionLog())
 }

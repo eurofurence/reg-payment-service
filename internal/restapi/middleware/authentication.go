@@ -8,11 +8,12 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-http-utils/headers"
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
-	"github.com/go-http-utils/headers"
-	"github.com/golang-jwt/jwt/v4"
 )
 
 const apiKeyHeader = "X-Api-Key"

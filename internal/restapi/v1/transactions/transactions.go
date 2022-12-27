@@ -2,12 +2,11 @@ package v1transactions
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-http-utils/headers"
@@ -72,45 +71,13 @@ func MakeGetTransactionsEndpoint(i interaction.Interactor) common.Endpoint[GetTr
 
 func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[CreateTransactionRequest, CreateTransactionResponse] {
 	return func(ctx context.Context, request *CreateTransactionRequest, logger logging.Logger) (*CreateTransactionResponse, error) {
-		tr := request.Transaction
 
-		effDate, err := parseEffectiveDate(tr.EffectiveDate)
+		eTran, err := ToTransactionEntity(request.Transaction)
 		if err != nil {
 			return nil, err
 		}
 
-		tran := &entities.Transaction{
-			DebitorID:         tr.DebitorID,
-			TransactionID:     tr.TransactionIdentifier,
-			TransactionType:   tr.TransactionType,
-			PaymentMethod:     tr.Method,
-			PaymentStartUrl:   tr.PaymentStartUrl,
-			TransactionStatus: tr.Status,
-			Amount: entities.Amount{
-				ISOCurrency: tr.Amount.Currency,
-				GrossCent:   tr.Amount.GrossCent,
-				VatRate:     tr.Amount.VatRate,
-			},
-			Comment: tr.Comment,
-			EffectiveDate: sql.NullTime{
-				Valid: true,
-				Time:  effDate,
-			},
-		}
-
-		if tr.DueDate != "" {
-			dueDate, err := parseEffectiveDate(tr.DueDate)
-			if err != nil {
-				return nil, err
-			}
-
-			tran.DueDate = sql.NullTime{
-				Valid: true,
-				Time:  dueDate,
-			}
-		}
-
-		transaction, err := i.CreateTransaction(ctx, tran)
+		transaction, err := i.CreateTransaction(ctx, eTran)
 		if err != nil {
 			return nil, err
 		}
@@ -122,12 +89,17 @@ func MakeCreateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Cre
 func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[UpdateTransactionRequest, UpdateTransactionResponse] {
 	return func(ctx context.Context, request *UpdateTransactionRequest, logger logging.Logger) (*UpdateTransactionResponse, error) {
 
-		return nil, nil
+		eTran, err := ToTransactionEntity(request.Transaction)
+		if err != nil {
+			return nil, err
+		}
+
+		err = i.UpdateTransaction(ctx, eTran)
+		return nil, err
 	}
 }
 
 func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[InitiatePaymentRequest, InitiatePaymentResponse] {
-	// TODO
 	return func(ctx context.Context, request *InitiatePaymentRequest, logger logging.Logger) (*InitiatePaymentResponse, error) {
 		return nil, nil
 	}
@@ -205,12 +177,27 @@ func createTransactionResponseHandler(ctx context.Context, res *CreateTransactio
 }
 
 func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
-	var request UpdateTransactionRequest
-	if err := json.NewDecoder(r.Body).Decode(&request.Transaction); err != nil {
+	transactionID := chi.URLParam(r, "id")
+	if transactionID == "" {
+		return nil, errors.New("expected transaction id in url paramter, but received empty value")
+	}
+
+	var tran Transaction
+	if err := json.NewDecoder(r.Body).Decode(&tran); err != nil {
 		return nil, err
 	}
 
-	return &request, nil
+	if tran.DebitorID <= 0 {
+		return nil, errors.New("no debitor was provided in the request")
+	}
+
+	tran.TransactionIdentifier = transactionID
+
+	if anyNotEmpty(tran.PaymentStartUrl, string(tran.Method), string(tran.TransactionType), tran.Comment) {
+		return nil, errors.New("updates on transactions may only change the status, payment processor information and due date")
+	}
+
+	return &UpdateTransactionRequest{Transaction: tran}, nil
 }
 
 func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactionResponse, w http.ResponseWriter) error {
@@ -220,30 +207,18 @@ func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactio
 }
 
 func initiatePaymentRequestHandler(r *http.Request) (*InitiatePaymentRequest, error) {
-	// TODO
-	return nil, nil
+	var payReq InitiatePaymentRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&payReq.TransactionInitiator); err != nil {
+		return nil, err
+	}
+
+	return &payReq, nil
 }
 
 func initiatePaymentResponseHandler(ctx context.Context, res *InitiatePaymentResponse, w http.ResponseWriter) error {
 	// TODO
 	return nil
-}
-
-// Effective dates are only valid for an exact day without time.
-// We will parse them in the ISO 8601 (yyyy-mm-dd) format without time
-//
-// If `effDate` is emty, we will return a zero time instead
-func parseEffectiveDate(effDate string) (time.Time, error) {
-	if effDate != "" {
-		parsed, err := time.Parse("2006-01-02", effDate)
-		if err != nil {
-			return time.Time{}, err
-		}
-
-		return parsed, nil
-	}
-
-	return time.Time{}, nil
 }
 
 func validateTransaction(t *Transaction) error {
@@ -264,4 +239,14 @@ func validateTransaction(t *Transaction) error {
 	}
 
 	return nil
+}
+
+func anyNotEmpty(values ...string) bool {
+	for _, v := range values {
+		if v != "" {
+			return true
+		}
+	}
+
+	return false
 }

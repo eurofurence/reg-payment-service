@@ -6,7 +6,9 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-type InitiatePaymentRequest struct{}
+type InitiatePaymentRequest struct {
+	TransactionInitiator TransactionInitiator
+}
 
 type InitiatePaymentResponse struct{}
 
@@ -74,4 +76,8 @@ type Transaction struct {
 	DueDate               string                      `json:"due_date,omitempty"`
 	CreationDate          *time.Time                  `json:"creation_date,omitempty"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
+}
+
+type TransactionInitiator struct {
+	DebitorID int64 `json:"debitor_id"`
 }

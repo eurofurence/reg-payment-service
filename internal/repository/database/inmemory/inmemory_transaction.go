@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"sync/atomic"
+	"time"
+
+	"gorm.io/gorm"
 
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
@@ -17,7 +20,7 @@ func (m *inmemoryProvider) CreateTransaction(ctx context.Context, tr entities.Tr
 	return nil
 }
 
-func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Transaction) error {
+func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Transaction, _ bool) error {
 	if tr.ID == 0 {
 		return errors.New("cannot update a new transaction")
 	}
@@ -26,6 +29,7 @@ func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Tr
 		return errors.New("transaction not found in database")
 	}
 	m.transactions[tr.ID] = tr
+
 	return nil
 }
 
@@ -74,4 +78,19 @@ func (m *inmemoryProvider) GetValidTransactionsForDebitor(ctx context.Context, d
 
 func (m *inmemoryProvider) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
 	panic("not implemented") // TODO: Implement
+}
+
+func (m *inmemoryProvider) DeleteTransaction(ctx context.Context, tr entities.Transaction) error {
+	if tr, e := m.transactions[tr.ID]; e {
+		tr.DeletedAt = gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		tr.Deletion = entities.Deletion{
+			Status:  tr.TransactionStatus,
+			Comment: "incorrect transaction",
+			By:      "admin",
+		}
+
+		m.transactions[tr.ID] = tr
+	}
+
+	return nil
 }

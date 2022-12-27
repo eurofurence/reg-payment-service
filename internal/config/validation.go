@@ -4,10 +4,11 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"github.com/golang-jwt/jwt/v4"
 	"net/url"
 	"regexp"
 	"sort"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 func Validate(conf *Application, logFunc func(format string, v ...interface{})) error {
