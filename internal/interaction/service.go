@@ -16,6 +16,7 @@ var _ Interactor = (*serviceInteractor)(nil)
 type Interactor interface {
 	GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error)
 	CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error)
+	CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64) (*entities.Transaction, error)
 	UpdateTransaction(ctx context.Context, tran *entities.Transaction) error
 }
 

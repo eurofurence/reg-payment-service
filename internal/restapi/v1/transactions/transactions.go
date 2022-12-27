@@ -100,7 +100,6 @@ func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Upd
 }
 
 func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[InitiatePaymentRequest, InitiatePaymentResponse] {
-	// TODO
 	return func(ctx context.Context, request *InitiatePaymentRequest, logger logging.Logger) (*InitiatePaymentResponse, error) {
 		return nil, nil
 	}
@@ -208,8 +207,13 @@ func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactio
 }
 
 func initiatePaymentRequestHandler(r *http.Request) (*InitiatePaymentRequest, error) {
-	// TODO
-	return nil, nil
+	var payReq InitiatePaymentRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&payReq.TransactionInitiator); err != nil {
+		return nil, err
+	}
+
+	return &payReq, nil
 }
 
 func initiatePaymentResponseHandler(ctx context.Context, res *InitiatePaymentResponse, w http.ResponseWriter) error {

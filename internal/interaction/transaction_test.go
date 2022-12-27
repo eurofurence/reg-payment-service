@@ -26,6 +26,104 @@ func tstServiceInteractor(repo database.Repository, attendeeSvc attendeeservice.
 	}
 }
 
+func TestIsValidStatusChange(t *testing.T) {
+	type args struct {
+		oldStatus entities.TransactionStatus
+		newStatus entities.TransactionStatus
+	}
+
+	/*
+		TransactionStatusTentative TransactionStatus = "tentative"
+		TransactionStatusPending   TransactionStatus = "pending"
+		TransactionStatusValid     TransactionStatus = "valid"
+		TransactionStatusDeleted   TransactionStatus = "deleted"
+	*/
+	tests := []struct {
+		name     string
+		args     args
+		expected bool
+	}{
+		{
+			name: "should return true for tentative to pending",
+			args: args{
+				oldStatus: entities.TransactionStatusTentative,
+				newStatus: entities.TransactionStatusPending,
+			},
+			expected: true,
+		},
+		{
+			name: "should return true for tentative to deleted",
+			args: args{
+				oldStatus: entities.TransactionStatusTentative,
+				newStatus: entities.TransactionStatusDeleted,
+			},
+			expected: true,
+		},
+		{
+			name: "should return false for tentative to tentative",
+			args: args{
+				oldStatus: entities.TransactionStatusTentative,
+				newStatus: entities.TransactionStatusTentative,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for tentative to valid",
+			args: args{
+				oldStatus: entities.TransactionStatusTentative,
+				newStatus: entities.TransactionStatusValid,
+			},
+			expected: false,
+		},
+		{
+			name: "should return true for pending to valid",
+			args: args{
+				oldStatus: entities.TransactionStatusPending,
+				newStatus: entities.TransactionStatusValid,
+			},
+			expected: true,
+		},
+		{
+			name: "should return true for pending to deleted",
+			args: args{
+				oldStatus: entities.TransactionStatusPending,
+				newStatus: entities.TransactionStatusDeleted,
+			},
+			expected: true,
+		},
+		{
+			name: "should return false for pending to pending",
+			args: args{
+				oldStatus: entities.TransactionStatusPending,
+				newStatus: entities.TransactionStatusPending,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for pending to tentative",
+			args: args{
+				oldStatus: entities.TransactionStatusPending,
+				newStatus: entities.TransactionStatusTentative,
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			curTran := entities.Transaction{
+				TransactionStatus: tt.args.oldStatus,
+			}
+			newTran := entities.Transaction{
+				TransactionStatus: tt.args.newStatus,
+			}
+
+			require.Equal(t, tt.expected, isValidStatusChange(curTran, newTran))
+		})
+	}
+
+}
+
 func TestValidateAttendeeTransaction(t *testing.T) {
 
 	type args struct {

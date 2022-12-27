@@ -17,7 +17,7 @@ type TransactionRepository interface {
 	GetTransactionByTransactionIDAndType(ctx context.Context, transactionID string, tType entities.TransactionType) (*entities.Transaction, error)
 	GetTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error)
 	GetValidTransactionsForDebitor(ctx context.Context, debitorID int64) ([]entities.Transaction, error)
-	QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error)
+	QueryOutstandingDuesForDebitor(ctx context.Context, debitorID int64) (int64, error)
 	UpdateTransaction(ctx context.Context, tr entities.Transaction, historize bool) error
 	DeleteTransaction(ctx context.Context, tr entities.Transaction) error
 }

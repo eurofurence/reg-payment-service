@@ -3,6 +3,7 @@ package interaction
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -53,10 +54,10 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 			return nil, err
 		}
 
-		// TODO new order
-		// 1. create transaction
-		// 2. create paymentlink
-		// 3. update transaction with paymentlink
+		// create a transaction in the database
+		if err := s.store.CreateTransaction(ctx, *tran); err != nil {
+			return nil, err
+		}
 
 		// generate a payment link
 		paymentLink, err := s.createPaymentLink(ctx, *tran)
@@ -66,12 +67,9 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		}
 
 		tran.PaymentStartUrl = paymentLink
-		// What do we do with response.ReferenceId?
 
-		// create a transaction in the database
-		if err := s.store.CreateTransaction(ctx, *tran); err != nil {
-			return nil, err
-		}
+		// update the payment link in the database
+		s.store.UpdateTransaction(ctx, *tran, true)
 
 		// inform the attendee service that there is a new payment in the database
 		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
@@ -82,6 +80,40 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 	}
 
 	return nil, apierrors.NewForbidden("unable to determine the request permissions")
+}
+
+func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64) (*entities.Transaction, error) {
+	validTransactions, err := s.store.GetValidTransactionsForDebitor(ctx, debitorID)
+	if err != nil {
+		return nil, err // TODO api error
+	}
+
+	if len(validTransactions) == 0 {
+		return nil, errors.New("no valid dues found in order to initiate payment") // TODO api error
+	}
+
+	first := validTransactions[0]
+
+	dues, err := s.store.QueryOutstandingDuesForDebitor(ctx, debitorID)
+	if err != nil {
+		return nil, err // TODO api error
+	}
+
+	if dues <= 0 {
+		return nil, errors.New("no outstanding dues for debitor") // TODO api error
+	}
+
+	return s.CreateTransaction(ctx, &entities.Transaction{
+		DebitorID:         debitorID,
+		TransactionType:   entities.TransactionTypePayment,
+		PaymentMethod:     entities.PaymentMethodCredit,
+		TransactionStatus: entities.TransactionStatusTentative,
+		Amount: entities.Amount{
+			ISOCurrency: first.Amount.ISOCurrency,
+			VatRate:     first.Amount.VatRate,
+			GrossCent:   dues,
+		},
+	})
 }
 
 func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
@@ -108,15 +140,15 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 
 	curTran := res[0]
 
-	// check if transaction should be deleted or not
-	if !reflect.ValueOf(tran.Deletion).IsZero() {
+	// check if transaction should be deleted or not by an admin
+	if !reflect.ValueOf(tran.Deletion).IsZero() && mgr.IsAdmin() {
 		// Within 3 calendar days of creation, for any transaction an admin may change
 		// - status -> deleted
 		const maxDaysForDeletion = 3.0
 		days := time.Now().UTC().Sub(curTran.CreatedAt.UTC()).Hours() / 24.0
 
 		if days > maxDaysForDeletion {
-			return apierrors.NewForbidden("")
+			return apierrors.NewForbidden("unable to flag transaction as deleted after 3 days")
 		}
 
 		// update the deletion status with the current status that was
