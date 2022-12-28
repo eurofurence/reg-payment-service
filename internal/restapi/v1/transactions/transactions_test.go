@@ -1,12 +1,16 @@
 package v1transactions
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"reflect"
 	"testing"
 	"time"
 
@@ -18,8 +22,33 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
+
+type statusCodeResponseWriter struct {
+	contents   []byte
+	statusCode int
+	called     bool
+	headers    http.Header
+}
+
+func (s *statusCodeResponseWriter) Header() http.Header {
+	if s.headers == nil {
+		s.headers = make(http.Header)
+	}
+	return s.headers
+}
+
+func (s *statusCodeResponseWriter) Write(b []byte) (int, error) {
+	s.contents = append(s.contents, b...)
+	return len(b), nil
+}
+
+func (s *statusCodeResponseWriter) WriteHeader(statusCode int) {
+	s.called = true
+	s.statusCode = statusCode
+}
 
 //go:generate moq -pkg v1transactions -stub -out attendeeservice_moq_test.go ../../../repository/downstreams/attendeeservice/ AttendeeService
 //go:generate moq -pkg v1transactions -stub -out cncrdadapter_moq_test.go ../../../repository/downstreams/cncrdadapter/ CncrdAdapter
@@ -384,4 +413,331 @@ func TestGetTransactionsRequestHandler(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetTransactionsResponseHandler(t *testing.T) {
+	type expected struct {
+		err         error
+		statusCode  int
+		contentType reflect.Type
+	}
+
+	tests := []struct {
+		name     string
+		input    *GetTransactionsResponse
+		expected expected
+	}{
+		{
+			name:  "Should return error when response is nil",
+			input: nil,
+			expected: expected{
+				err:         common.ErrorFromMessage(common.TransactionReadErrorMessage),
+				statusCode:  0,
+				contentType: nil,
+			},
+		},
+		{
+			name:  "Should return not found when payload doesn't contain transaction",
+			input: &GetTransactionsResponse{},
+			expected: expected{
+				err:         nil,
+				statusCode:  404,
+				contentType: reflect.TypeOf(common.APIError{}),
+			},
+		},
+		{
+			name: "Should return transactions when payload is set",
+			input: &GetTransactionsResponse{
+				Payload: []Transaction{
+					{
+						DebitorID:             1,
+						TransactionIdentifier: "abc",
+					},
+				},
+			},
+			expected: expected{
+				err:         nil,
+				statusCode:  0,
+				contentType: reflect.TypeOf(GetTransactionsResponse{}),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &statusCodeResponseWriter{}
+			err := getTransactionsResponseHandler(context.Background(), tt.input, w)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, tt.expected.err, err.Error())
+				require.Equal(t, tt.expected.statusCode, w.statusCode)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.statusCode, w.statusCode)
+
+				rtIface := reflect.New(tt.expected.contentType).Interface()
+
+				err := json.Unmarshal(w.contents, rtIface)
+				require.NoError(t, err)
+				require.NotZero(t, rtIface)
+
+				if tt.expected.statusCode == 0 {
+					if res, ok := rtIface.(*GetTransactionsResponse); ok {
+						require.NotNil(t, res)
+					} else {
+						require.FailNow(t, "invalid type")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestCreateTransactionRequestHandler(t *testing.T) {
+	testTime := time.Now()
+	type expected struct {
+		err error
+		req *CreateTransactionRequest
+	}
+
+	tests := []struct {
+		name     string
+		input    Transaction
+		expected expected
+	}{
+		{
+			name:  "Should return error when body is empty",
+			input: Transaction{},
+			expected: expected{
+				err: errors.New("EOF"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return error when transaction contains invalid debitor ID",
+			input: ToV1Transaction(newTransaction(0, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusTentative, testTime)),
+			expected: expected{
+				err: errors.New("invalid debitor id supplied - DebitorID: 0"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return error when transaction contains invalid type",
+			input: ToV1Transaction(newTransaction(1, "1230", "Kevin", entities.PaymentMethodCredit, entities.TransactionStatusTentative, testTime)),
+			expected: expected{
+				err: errors.New("invalid transaction type - TransactionType: Kevin"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return error when transaction contains invalid method",
+			input: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, "Kevin", entities.TransactionStatusTentative, testTime)),
+			expected: expected{
+				err: errors.New("invalid payment method - Method: Kevin"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return error when transaction contains invalid status",
+			input: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, "Kevin", testTime)),
+			expected: expected{
+				err: errors.New("invalid transaction status - Status: Kevin"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return error when transaction status is deleted",
+			input: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusDeleted, testTime)),
+			expected: expected{
+				err: errors.New("invalid transaction status - Status: deleted"),
+				req: nil,
+			},
+		},
+		{
+			name:  "Should return valid request when transaction is validated",
+			input: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+			expected: expected{
+				err: nil,
+				req: &CreateTransactionRequest{
+					Transaction: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "http://example.com/transaction", toTransactionRequestBody(tt.input))
+			req, err := createTransactionRequestHandler(r)
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, req)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.req, req)
+			}
+		})
+	}
+}
+
+func TestCreateTransactionResponseHandler(t *testing.T) {
+	type expected struct {
+		err        error
+		statusCode int
+		content    reflect.Type
+	}
+
+	tests := []struct {
+		name     string
+		input    *CreateTransactionResponse
+		expected expected
+	}{
+		{
+			name:  "should send status created and provide location header",
+			input: &CreateTransactionResponse{Transaction: Transaction{TransactionIdentifier: "12345"}},
+			expected: expected{
+				err:        nil,
+				statusCode: http.StatusCreated,
+				content:    reflect.TypeOf(CreateTransactionResponse{}),
+			},
+		},
+		{
+			name:  "should return error when response is nil",
+			input: nil,
+			expected: expected{
+				err:        errors.New("invalid response - cannot provide transaction information"),
+				statusCode: 0,
+				content:    nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := &statusCodeResponseWriter{}
+			err := createTransactionResponseHandler(context.Background(), tt.input, w)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, tt.expected.err, err.Error())
+				require.Equal(t, tt.expected.statusCode, w.statusCode)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.statusCode, w.statusCode)
+
+				rtIface := reflect.New(tt.expected.content).Interface()
+
+				err := json.Unmarshal(w.contents, rtIface)
+				require.NoError(t, err)
+				require.NotZero(t, rtIface)
+
+				if tt.expected.statusCode == http.StatusCreated {
+					if res, ok := rtIface.(*CreateTransactionResponse); ok {
+						require.NotNil(t, res)
+					} else {
+						require.FailNow(t, "invalid type")
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestUpdateTransactionRequestHandler(t *testing.T) {
+	testTime := time.Now()
+
+	type args struct {
+		transactionID string
+		transaction   Transaction
+	}
+
+	type expected struct {
+		err error
+		req *UpdateTransactionRequest
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should return error when no transaction ID provided",
+			args: args{
+				transactionID: "",
+				transaction:   ToV1Transaction(newTransaction(1, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+			},
+			expected: expected{
+				err: errors.New("expected transaction id in url paramter, but received empty value"),
+				req: nil,
+			},
+		},
+		{
+			name: "should return error when debitor id is not valid",
+			args: args{
+				transactionID: "1234",
+				transaction:   ToV1Transaction(newTransaction(0, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+			},
+			expected: expected{
+				err: errors.New("no debitor was provided in the request"),
+				req: nil,
+			},
+		},
+		{
+			name: "should return error when paymenturl set",
+			args: args{
+				transactionID: "1234",
+				transaction:   Transaction{DebitorID: 10, Status: entities.TransactionStatusPending, PaymentStartUrl: "12398"},
+			},
+			expected: expected{
+				err: errors.New("updates on transactions may only change the status, payment processor information and due date"),
+				req: nil,
+			},
+		},
+		{
+			name: "should return update transaction request when everything is successful",
+			args: args{
+				transactionID: "1234",
+				transaction:   Transaction{DebitorID: 10, Status: entities.TransactionStatusPending},
+			},
+			expected: expected{
+				err: nil,
+				req: &UpdateTransactionRequest{
+					Transaction: Transaction{
+						DebitorID:             10,
+						TransactionIdentifier: "1234",
+						Status:                entities.TransactionStatusPending,
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			r := httptest.NewRequest(http.MethodPost, "http://example.com/transaction/{id}", toTransactionRequestBody(tt.args.transaction))
+			ctx := chi.NewRouteContext()
+			ctx.URLParams.Add("id", tt.args.transactionID)
+
+			r = r.WithContext(context.WithValue(context.TODO(), chi.RouteCtxKey, ctx))
+
+			req, err := updateTransactionRequestHandler(r)
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, req)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.req, req)
+			}
+		})
+	}
+}
+
+func toTransactionRequestBody(req Transaction) io.Reader {
+	if reflect.ValueOf(req).IsZero() {
+		return nil
+	}
+
+	b, _ := json.Marshal(req)
+	return bytes.NewBuffer(b)
 }

@@ -3,14 +3,20 @@ package interaction
 import (
 	"context"
 	"errors"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/eurofurence/reg-payment-service/internal/apierrors"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
+	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
+	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -24,6 +30,519 @@ func tstServiceInteractor(repo database.Repository, attendeeSvc attendeeservice.
 		attendeeClient: attendeeSvc,
 		cncrdClient:    adapter,
 	}
+}
+
+func TestMain(m *testing.M) {
+	f, err := os.Open("../../docs/config.example.yaml")
+	if err != nil {
+		os.Exit(1)
+	}
+	_, err = config.UnmarshalFromYamlConfiguration(f)
+	if err != nil {
+		os.Exit(1)
+	}
+	os.Exit(m.Run())
+
+}
+
+func seedDB(db database.Repository, transactions []entities.Transaction) {
+	for _, tr := range transactions {
+		db.CreateTransaction(context.Background(), tr)
+	}
+}
+
+func TestCreateTransaction(t *testing.T) {
+
+	type args struct {
+		paymentsChangedFunc   func(ctx context.Context, debitorId uint) error
+		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
+		createPaylinkFunc     func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error)
+		transaction           *entities.Transaction
+		ctx                   context.Context
+		seed                  []entities.Transaction
+	}
+
+	type expected struct {
+		createPayLink bool
+		err           error
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should fail when currency is not allowed",
+			args: args{
+				transaction: &entities.Transaction{
+					Amount: entities.Amount{
+						ISOCurrency: "USD",
+						GrossCent:   1000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("invalid currency USD provided"),
+			},
+		},
+		{
+			name: "should fail without permissions",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:       1,
+					TransactionID:   "1",
+					TransactionType: entities.TransactionTypeDue,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   1000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: context.Background(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("unable to determine the request permissions"),
+			},
+		},
+		{
+			name: "should fail when admin tries to create due transaction",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:       1,
+					TransactionID:   "1",
+					TransactionType: entities.TransactionTypeDue,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   1000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("Admin role is not allowed to create transactions of type due"),
+			},
+		},
+		{
+			name: "should fail when pending payments are present",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:       1,
+					TransactionType: entities.TransactionTypePayment,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: adminCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusPending,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewConflict("There are pending payments for attendee 1"),
+			},
+		},
+		{
+			name: "should create due transaction in s2s call",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:       1,
+					TransactionType: entities.TransactionTypeDue,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx:  apiKeyCtx(),
+				seed: nil,
+			},
+			expected: expected{
+				err: nil,
+			},
+		},
+		{
+			name: "should create transaction and request payment link",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: adminCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: true,
+			},
+		},
+		{
+			name: "should fail validation for attendee transaction due to missing registration id",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("transactions for debitorID 1 may not be altered"),
+			},
+		},
+		{
+			name: "should fail validation for attendee transaction due to missing registration id",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("transactions for debitorID 1 may not be altered"),
+			},
+		},
+		{
+			name: "should fail validation for attendee transaction if status is incorrect",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1, 2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodGift,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("transaction is not eligible for requesting a payment link"),
+			},
+		},
+		{
+			name: "should fail validation for attendee transaction if status is incorrect",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1, 2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodGift,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("transaction is not eligible for requesting a payment link"),
+			},
+		},
+		{
+			name: "should fail creation of payment for attendee, when pending payments exist",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1, 2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusPending,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewConflict("There are pending payments for attendee 1"),
+			},
+		},
+		{
+			name: "should create transaction and payment link for attendee",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1, 2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: true,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asm := &AttendeeServiceMock{
+				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
+				PaymentsChangedFunc:       tt.args.paymentsChangedFunc,
+			}
+
+			ccm := &CncrdAdapterMock{
+				CreatePaylinkFunc: tt.args.createPaylinkFunc,
+			}
+
+			db := inmemory.NewInMemoryProvider()
+			seedDB(db, tt.args.seed)
+
+			i, err := NewServiceInteractor(db, asm, ccm, logging.NewNoopLogger())
+			require.NoError(t, err)
+
+			res, err := i.CreateTransaction(tt.args.ctx, tt.args.transaction)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, res)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				if tt.expected.createPayLink {
+					require.NotEmpty(t, res.PaymentStartUrl)
+				}
+			}
+
+		})
+	}
+}
+
+func TestUpdateTransaction(t *testing.T) {
+	// TODO
+}
+
+func newTransaction(debID int64, tranID string,
+	pType entities.TransactionType,
+	method entities.PaymentMethod,
+	status entities.TransactionStatus,
+	amount entities.Amount,
+) entities.Transaction {
+	return entities.Transaction{
+		DebitorID:         debID,
+		TransactionID:     tranID,
+		TransactionType:   pType,
+		PaymentMethod:     method,
+		TransactionStatus: status,
+		Amount:            amount,
+		Comment:           "Comment",
+	}
+}
+
+func apiKeyCtx() context.Context {
+	return context.WithValue(context.Background(), common.CtxKeyAPIKey{}, "123456")
+}
+
+func adminCtx() context.Context {
+	return contextWithClaims(&common.AllClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject: "1234567890",
+		},
+		CustomClaims: common.CustomClaims{
+			Global: common.GlobalClaims{
+				Roles: []string{"admin"},
+			},
+		},
+	})
+}
+
+func attendeeCtx() context.Context {
+	return contextWithClaims(&common.AllClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject: "1234567890",
+		},
+		CustomClaims: common.CustomClaims{
+			Global: common.GlobalClaims{
+				Roles: []string{""},
+			},
+		},
+	})
+}
+
+func contextWithClaims(claims *common.AllClaims) context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.CtxKeyClaims{}, claims)
+	ctx = context.WithValue(ctx, common.CtxKeyToken{}, "token12345")
+
+	return ctx
 }
 
 func TestIsValidStatusChange(t *testing.T) {

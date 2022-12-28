@@ -3,6 +3,7 @@ package inmemory
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -22,8 +23,14 @@ func (m *inmemoryProvider) CreateTransaction(ctx context.Context, tr entities.Tr
 
 func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Transaction, _ bool) error {
 	if tr.ID == 0 {
-		return errors.New("cannot update a new transaction")
+		found, err := m.GetTransactionByTransactionIDAndType(ctx, tr.TransactionID, tr.TransactionType)
+		if err != nil {
+			return err
+		}
+
+		tr.ID = found.ID
 	}
+
 	_, ok := m.transactions[tr.ID]
 	if !ok {
 		return errors.New("transaction not found in database")
@@ -77,7 +84,22 @@ func (m *inmemoryProvider) GetValidTransactionsForDebitor(ctx context.Context, d
 }
 
 func (m *inmemoryProvider) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
-	panic("not implemented") // TODO: Implement
+	dues := int64(0)
+	payments := int64(0)
+
+	for _, tr := range m.transactions {
+		if reflect.ValueOf(tr.Deletion).IsZero() && tr.TransactionStatus == entities.TransactionStatusValid {
+			if tr.TransactionType == entities.TransactionTypeDue {
+				dues += tr.Amount.GrossCent
+			}
+
+			if tr.TransactionType == entities.TransactionTypePayment {
+				payments += tr.Amount.GrossCent
+			}
+		}
+	}
+
+	return (dues - payments), nil
 }
 
 func (m *inmemoryProvider) DeleteTransaction(ctx context.Context, tr entities.Transaction) error {

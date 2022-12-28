@@ -170,6 +170,9 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 }
 
 func createTransactionResponseHandler(ctx context.Context, res *CreateTransactionResponse, w http.ResponseWriter) error {
+	if res == nil {
+		return errors.New("invalid response - cannot provide transaction information")
+	}
 	w.Header().Add(headers.Location, fmt.Sprintf("api/rest/v1/transactions/%s", res.Transaction.TransactionIdentifier))
 
 	w.WriteHeader(http.StatusCreated)
@@ -235,7 +238,7 @@ func validateTransaction(t *Transaction) error {
 	}
 
 	if !t.Status.IsValid() || t.Status == entities.TransactionStatusDeleted {
-		return fmt.Errorf("invalid transaction status - Method: %s", string(t.Status))
+		return fmt.Errorf("invalid transaction status - Status: %s", string(t.Status))
 	}
 
 	return nil
