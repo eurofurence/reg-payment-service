@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/eurofurence/reg-payment-service/internal/entities"
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
@@ -29,7 +28,6 @@ type serviceInteractor struct {
 func NewServiceInteractor(r database.Repository,
 	attClient attendeeservice.AttendeeService,
 	ccClient cncrdadapter.CncrdAdapter,
-	logger logging.Logger,
 ) (Interactor, error) {
 
 	if r == nil {
@@ -41,7 +39,7 @@ func NewServiceInteractor(r database.Repository,
 	}
 
 	if ccClient == nil {
-		return nil, errors.New("cncrd adapter client provided")
+		return nil, errors.New("no payment adapter client provided")
 	}
 
 	return &serviceInteractor{

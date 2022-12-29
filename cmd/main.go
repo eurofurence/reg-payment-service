@@ -79,7 +79,7 @@ func main() {
 	})
 
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo, attClient, ccClient, logger)
+		return interaction.NewServiceInteractor(repo, attClient, ccClient)
 	})
 
 	logger.Debug("Setting up router")

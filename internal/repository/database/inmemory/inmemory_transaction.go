@@ -3,6 +3,7 @@ package inmemory
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync/atomic"
 	"time"
 
@@ -16,14 +17,26 @@ func (m *inmemoryProvider) CreateTransaction(ctx context.Context, tr entities.Tr
 		return errors.New("create needs a new transaction")
 	}
 	tr.ID = uint(atomic.AddUint32(&m.idSequence, 1))
+
+	// set a creation date if none was provided beforehand
+	if tr.CreatedAt.IsZero() {
+		tr.CreatedAt = time.Now()
+	}
+
 	m.transactions[tr.ID] = tr
 	return nil
 }
 
 func (m *inmemoryProvider) UpdateTransaction(ctx context.Context, tr entities.Transaction, _ bool) error {
 	if tr.ID == 0 {
-		return errors.New("cannot update a new transaction")
+		found, err := m.GetTransactionByTransactionIDAndType(ctx, tr.TransactionID, tr.TransactionType)
+		if err != nil {
+			return err
+		}
+
+		tr.ID = found.ID
 	}
+
 	_, ok := m.transactions[tr.ID]
 	if !ok {
 		return errors.New("transaction not found in database")
@@ -77,19 +90,35 @@ func (m *inmemoryProvider) GetValidTransactionsForDebitor(ctx context.Context, d
 }
 
 func (m *inmemoryProvider) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
-	panic("not implemented") // TODO: Implement
+	dues := int64(0)
+	payments := int64(0)
+
+	for _, tr := range m.transactions {
+		if reflect.ValueOf(tr.Deletion).IsZero() && tr.TransactionStatus == entities.TransactionStatusValid {
+			if tr.TransactionType == entities.TransactionTypeDue {
+				dues += tr.Amount.GrossCent
+			}
+
+			if tr.TransactionType == entities.TransactionTypePayment {
+				payments += tr.Amount.GrossCent
+			}
+		}
+	}
+
+	return (dues - payments), nil
 }
 
 func (m *inmemoryProvider) DeleteTransaction(ctx context.Context, tr entities.Transaction) error {
-	if tr, e := m.transactions[tr.ID]; e {
-		tr.DeletedAt = gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
-		tr.Deletion = entities.Deletion{
+	if cur, e := m.transactions[tr.ID]; e {
+		cur.DeletedAt = gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		cur.Deletion = entities.Deletion{
 			Status:  tr.TransactionStatus,
-			Comment: "incorrect transaction",
-			By:      "admin",
+			Comment: tr.Deletion.Comment,
+			By:      tr.Deletion.By,
 		}
+		cur.TransactionStatus = entities.TransactionStatusDeleted
 
-		m.transactions[tr.ID] = tr
+		m.transactions[cur.ID] = cur
 	}
 
 	return nil
