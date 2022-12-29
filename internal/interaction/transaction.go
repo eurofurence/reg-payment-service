@@ -30,7 +30,7 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 	// check if currency is allowed
 	if !isCurrencyAllowed(appConfig.Service.AllowedCurrencies, tran.Amount.ISOCurrency) {
-		return nil, apierrors.NewForbidden(fmt.Sprintf("invalid currency %s provided", tran.Amount.ISOCurrency))
+		return nil, apierrors.NewBadRequest(fmt.Sprintf("invalid currency %s provided", tran.Amount.ISOCurrency))
 	}
 
 	// generate a transaction ID if none exists
