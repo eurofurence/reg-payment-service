@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -55,8 +56,9 @@ func (s *statusCodeResponseWriter) WriteHeader(statusCode int) {
 
 func setupServer(t *testing.T, att *AttendeeServiceMock, cncrd *CncrdAdapterMock) (string, func()) {
 	router := chi.NewRouter()
-	router.Use(middleware.RequestIdMiddleware())
-	router.Use(middleware.LogRequestIdMiddleware())
+	router.Use(middleware.RequestIdMiddleware)
+	router.Use(loggermiddleware.AddZerologLoggerToContext)
+	router.Use(middleware.RequestLoggerMiddleware)
 	router.Use(middleware.CorsHeadersMiddleware(nil))
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface

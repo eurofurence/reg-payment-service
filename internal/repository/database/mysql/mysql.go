@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 
 	"gorm.io/driver/mysql"
@@ -31,6 +32,7 @@ func NewMySQLConnector(conf config.DatabaseConfig, logger logging.Logger) (datab
 		NamingStrategy: schema.NamingStrategy{
 			TablePrefix: "pay_",
 		},
+		Logger: gormlogger.Default.LogMode(gormlogger.Silent),
 	}
 	db, err := gorm.Open(mysql.Open(dsn), &gormConfig)
 	if err != nil {

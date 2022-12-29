@@ -1,10 +1,9 @@
-package common
+package logging
 
 import (
 	"context"
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"testing"
 )
 
 func TestGetRequestID(t *testing.T) {
@@ -15,7 +14,7 @@ func TestGetRequestID(t *testing.T) {
 	}{
 		{
 			name:         "Should return valid requestID",
-			inputContext: context.WithValue(context.Background(), CtxKeyRequestID{}, "valid"),
+			inputContext: context.WithValue(context.Background(), RequestIdKey, "valid"),
 			expectedID:   "valid",
 		},
 	}

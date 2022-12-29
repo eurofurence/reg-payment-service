@@ -17,8 +17,8 @@ func CreateHandler[Req, Res any](endpoint Endpoint[Req, Res],
 	responseHandler ResponseHandler[Res]) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		reqID := GetRequestID(ctx)
-		logger := logging.WithRequestID(ctx, reqID)
+		reqID := logging.GetRequestID(ctx)
+		logger := logging.LoggerFromContext(ctx)
 
 		defer func() {
 			err := r.Body.Close()

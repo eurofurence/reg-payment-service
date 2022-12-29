@@ -145,8 +145,8 @@ func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsRes
 	}
 
 	if len(res.Payload) == 0 {
-		reqID := common.GetRequestID(ctx)
-		logger := logging.WithRequestID(ctx, reqID)
+		reqID := logging.GetRequestID(ctx)
+		logger := logging.LoggerFromContext(ctx)
 		common.SendStatusNotFoundResponse(w, reqID, logger, "")
 		return nil
 	}
