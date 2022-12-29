@@ -86,7 +86,7 @@ func TestCreateTransaction(t *testing.T) {
 				ctx: adminCtx(),
 			},
 			expected: expected{
-				err: apierrors.NewForbidden("invalid currency USD provided"),
+				err: apierrors.NewBadRequest("invalid currency USD provided"),
 			},
 		},
 		{
