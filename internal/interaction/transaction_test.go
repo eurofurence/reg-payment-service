@@ -6,11 +6,11 @@ import (
 	"os"
 	"regexp"
 	"testing"
+	"time"
 
 	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
@@ -18,6 +18,7 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 //go:generate moq -pkg interaction -stub -out attendeeservice_moq_test.go ../repository/downstreams/attendeeservice/ AttendeeService
@@ -466,7 +467,7 @@ func TestCreateTransaction(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm, logging.NewNoopLogger())
+			i, err := NewServiceInteractor(db, asm, ccm)
 			require.NoError(t, err)
 
 			res, err := i.CreateTransaction(tt.args.ctx, tt.args.transaction)
@@ -487,6 +488,199 @@ func TestCreateTransaction(t *testing.T) {
 }
 
 func TestUpdateTransaction(t *testing.T) {
+	type args struct {
+		paymentsChangedFunc   func(ctx context.Context, debitorId uint) error
+		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
+		createPaylinkFunc     func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error)
+		transaction           *entities.Transaction
+		ctx                   context.Context
+		seed                  []entities.Transaction
+	}
+
+	type expected struct {
+		err    error
+		status entities.TransactionStatus
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should fail if not admin or service token call",
+			args: args{
+				ctx: attendeeCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("no permission to update transaction"),
+			},
+		},
+		{
+			name: "should return not found if original transaction could not be found in the database",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:     1,
+					TransactionID: "12345",
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewNotFound("transaction 12345 for debitor 1 could not be found"),
+			},
+		},
+		{
+			name: "should return an error when admin is trying to delete a transaction which is older than three days",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusDeleted,
+					Deletion: entities.Deletion{
+						Comment: "deleted for a reason",
+						By:      "Kevin",
+					},
+				},
+				seed: []entities.Transaction{
+					{
+						Model: gorm.Model{
+							CreatedAt: time.Now().AddDate(0, 0, -3).Add(-time.Second * 10),
+						},
+						DebitorID:     1,
+						TransactionID: "12345",
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("unable to flag transaction as deleted after 3 days"),
+			},
+		},
+		{
+			name: "should succesfully let admin delete the transaction when all conditions met",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusDeleted,
+					Deletion: entities.Deletion{
+						Comment: "deleted for a reason",
+						By:      "Kevin",
+					},
+				},
+				seed: []entities.Transaction{
+					{
+						DebitorID: 1,
+						Model: gorm.Model{
+							CreatedAt: time.Now().AddDate(0, 0, -1),
+						},
+						TransactionID: "12345",
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err:    nil,
+				status: entities.TransactionStatusDeleted,
+			},
+		},
+		{
+			name: "should return error when trying to update a due transaction",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusPending,
+				},
+				seed: []entities.Transaction{
+					{
+						DebitorID:       1,
+						TransactionID:   "12345",
+						TransactionType: entities.TransactionTypeDue,
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("cannot change the transaction of type due"),
+			},
+		},
+		{
+			name: "should return error if status change is not valid",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusTentative,
+				},
+				seed: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusPending,
+					},
+				},
+				ctx: adminCtx(),
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("cannot change status from pending to tentative for transaction 12345"),
+			},
+		},
+		{
+			name: "should successfully update a transaction",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionType:   entities.TransactionTypePayment,
+					TransactionStatus: entities.TransactionStatusPending,
+				},
+				seed: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusTentative,
+					},
+				},
+				ctx: apiKeyCtx(),
+			},
+			expected: expected{
+				err:    nil,
+				status: entities.TransactionStatusPending,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asm := &AttendeeServiceMock{
+				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
+				PaymentsChangedFunc:       tt.args.paymentsChangedFunc,
+			}
+
+			ccm := &CncrdAdapterMock{
+				CreatePaylinkFunc: tt.args.createPaylinkFunc,
+			}
+
+			db := inmemory.NewInMemoryProvider()
+			seedDB(db, tt.args.seed)
+
+			i, err := NewServiceInteractor(db, asm, ccm)
+			require.NoError(t, err)
+
+			err = i.UpdateTransaction(tt.args.ctx, tt.args.transaction)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+			} else {
+				require.NoError(t, err)
+				tran, err := db.GetTransactionByTransactionIDAndType(tt.args.ctx, tt.args.transaction.TransactionID, tt.args.transaction.TransactionType)
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.status, tran.TransactionStatus)
+			}
+		})
+	}
 	// TODO
 }
 
@@ -646,7 +840,7 @@ func TestIsValidStatusChange(t *testing.T) {
 func TestValidateAttendeeTransaction(t *testing.T) {
 
 	type args struct {
-		repoMock         RepositoryMock
+		repoMock         *RepositoryMock
 		attendeeSvc      *AttendeeServiceMock
 		inputTransaction entities.Transaction
 	}
@@ -669,7 +863,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return []entities.Transaction{tstDefaultTransaction(nil)}, nil
 					},
@@ -695,7 +889,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{2, 3, 4, 5}, nil
 					},
 				},
-				repoMock: RepositoryMock{},
+				repoMock: &RepositoryMock{},
 				inputTransaction: tstDefaultTransaction(func(t *entities.Transaction) {
 					t.TransactionType = entities.TransactionTypePayment
 					t.TransactionStatus = entities.TransactionStatusTentative
@@ -714,7 +908,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return []entities.Transaction{tstDefaultTransaction(nil)}, nil
 					},
@@ -740,7 +934,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return nil, errors.New("test")
 					},
@@ -766,7 +960,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return []entities.Transaction{tstDefaultTransaction(func(t *entities.Transaction) {
 							t.TransactionType = entities.TransactionTypePayment
@@ -795,7 +989,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return []entities.Transaction{tstDefaultTransaction(nil)}, nil
 					},
@@ -822,7 +1016,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 						return []int64{1}, nil
 					},
 				},
-				repoMock: RepositoryMock{
+				repoMock: &RepositoryMock{
 					GetTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 						return []entities.Transaction{tstDefaultTransaction(nil)}, nil
 					},
@@ -847,7 +1041,7 @@ func TestValidateAttendeeTransaction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i := tstServiceInteractor(&tt.args.repoMock, tt.args.attendeeSvc, &CncrdAdapterMock{})
+			i := tstServiceInteractor(tt.args.repoMock, tt.args.attendeeSvc, &CncrdAdapterMock{})
 			err := i.validateAttendeeTransaction(context.TODO(), &tt.args.inputTransaction)
 			if tt.expected.shouldFail {
 				require.EqualError(t, err, tt.expected.expectedError.Error())

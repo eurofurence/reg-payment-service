@@ -130,34 +130,43 @@ func isReasonOrCodeForError(expectedReason KnownReason, status int, err error) b
 
 }
 
+// IsBadRequestError checks if error is of type `bad request`
 func IsBadRequestError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonBadRequest, http.StatusBadRequest, err)
 }
 
+// IsUnauthorizedError checks if error is of type `unauthorized`
 func IsUnauthorizedError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonUnauthorized, http.StatusUnauthorized, err)
 }
 
+// IsForbiddenError checks if error is of type `forbidden`
 func IsForbiddenError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonForbidden, http.StatusForbidden, err)
 }
 
+// IsNotFoundError checks if error is of type `not found`
 func IsNotFoundError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonNotFound, http.StatusNotFound, err)
 }
 
+// IsConflictError checks if error is of type `conflict`
 func IsConflictError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonConflict, http.StatusConflict, err)
 }
 
+// IsInternalServerError checks if error is of type `internal server error`
 func IsInternalServerError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonInternalServerError, http.StatusInternalServerError, err)
 }
 
+// IsUnknownError checks if error is of type `unknown`
 func IsUnknownError(err error) bool {
 	return isReasonOrCodeForError(KnownReasonUnknown, 0, err)
 }
 
+// AsAPIStatus checks if the error is of type `APIStatus`
+// and returns nil if not
 func AsAPIStatus(err error) APIStatus {
 	if status, ok := err.(APIStatus); ok || errors.As(err, &status) {
 		return status

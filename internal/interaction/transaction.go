@@ -153,13 +153,13 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 
 		// update the deletion status with the current status that was
 		// TODO move logic to database
-		tran.Deletion.Status = curTran.TransactionStatus
-		tran.TransactionStatus = entities.TransactionStatusDeleted
+		curTran.Deletion.Status = curTran.TransactionStatus
+		curTran.TransactionStatus = entities.TransactionStatusDeleted
 
-		return s.store.DeleteTransaction(ctx, *tran)
+		return s.store.DeleteTransaction(ctx, curTran)
 	}
 
-	if tran.TransactionType == entities.TransactionTypeDue {
+	if curTran.TransactionType == entities.TransactionTypeDue {
 		return apierrors.NewForbidden("cannot change the transaction of type due")
 	}
 

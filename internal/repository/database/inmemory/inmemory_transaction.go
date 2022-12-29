@@ -17,6 +17,12 @@ func (m *inmemoryProvider) CreateTransaction(ctx context.Context, tr entities.Tr
 		return errors.New("create needs a new transaction")
 	}
 	tr.ID = uint(atomic.AddUint32(&m.idSequence, 1))
+
+	// set a creation date if none was provided beforehand
+	if tr.CreatedAt.IsZero() {
+		tr.CreatedAt = time.Now()
+	}
+
 	m.transactions[tr.ID] = tr
 	return nil
 }
@@ -103,15 +109,16 @@ func (m *inmemoryProvider) QueryOutstandingDuesForDebitor(ctx context.Context, d
 }
 
 func (m *inmemoryProvider) DeleteTransaction(ctx context.Context, tr entities.Transaction) error {
-	if tr, e := m.transactions[tr.ID]; e {
-		tr.DeletedAt = gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
-		tr.Deletion = entities.Deletion{
+	if cur, e := m.transactions[tr.ID]; e {
+		cur.DeletedAt = gorm.DeletedAt{Time: time.Now().UTC(), Valid: true}
+		cur.Deletion = entities.Deletion{
 			Status:  tr.TransactionStatus,
-			Comment: "incorrect transaction",
-			By:      "admin",
+			Comment: tr.Deletion.Comment,
+			By:      tr.Deletion.By,
 		}
+		cur.TransactionStatus = entities.TransactionStatusDeleted
 
-		m.transactions[tr.ID] = tr
+		m.transactions[cur.ID] = cur
 	}
 
 	return nil

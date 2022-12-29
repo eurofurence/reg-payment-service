@@ -61,8 +61,7 @@ func setupServer(t *testing.T, att *AttendeeServiceMock, cncrd *CncrdAdapterMock
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface
 		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(),
-			att, cncrd,
-			logging.NewNoopLogger())
+			att, cncrd)
 
 		require.NoError(t, err)
 		Create(r, s)
@@ -282,7 +281,7 @@ func TestHandleTransactions(t *testing.T) {
 
 		logger := logging.NewNoopLogger()
 
-		i, err := interaction.NewServiceInteractor(tt.args.db, tt.args.att, tt.args.cncrd, logger)
+		i, err := interaction.NewServiceInteractor(tt.args.db, tt.args.att, tt.args.cncrd)
 		require.NoError(t, err)
 
 		fn := MakeGetTransactionsEndpoint(i)
@@ -293,6 +292,8 @@ func TestHandleTransactions(t *testing.T) {
 		require.Len(t, resp.Payload, len(tt.expected.response.Payload))
 
 		for _, tr := range resp.Payload {
+			// do not check for creation date
+			tr.CreationDate = nil
 			require.Contains(t, tt.expected.response.Payload, tr)
 		}
 
