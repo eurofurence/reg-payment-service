@@ -1,7 +1,6 @@
 package common
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -85,15 +84,3 @@ func SendResponseWithStatusAndMessage(w http.ResponseWriter, status int, reqID s
 	apiErr := NewAPIError(reqID, message, detailValues)
 	EncodeToJSON(w, apiErr, logger)
 }
-
-func GetRequestID(ctx context.Context) string {
-	if ctx == nil {
-		return "00000000"
-	}
-	if reqID, ok := ctx.Value(CtxKeyRequestID{}).(string); ok {
-		return reqID
-	}
-	return "ffffffff"
-}
-
-// TODO SetRequestID func?

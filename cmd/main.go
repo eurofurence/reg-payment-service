@@ -36,9 +36,9 @@ var (
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
-	logger := logging.NewLogger()
 
-	ctx = context.WithValue(ctx, logging.LoggerKey, logger)
+	logging.SetupLogging("payment-service", false)
+	logger := logging.NewLogger()
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
@@ -152,7 +152,6 @@ func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) 
 
 	return conf, nil
 }
-
 func constructOrFail[T any](ctx context.Context, logger logging.Logger, constructor func() (T, error)) T {
 	const failMsg = "Construction failed. [error]: %v"
 	if constructor == nil {

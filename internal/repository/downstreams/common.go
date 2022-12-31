@@ -3,6 +3,7 @@ package downstreams
 import (
 	"context"
 	"errors"
+	aurestlogging "github.com/StephanHCB/go-autumn-restclient/implementation/requestlogging"
 	"net/http"
 	"time"
 
@@ -41,7 +42,7 @@ func ClientWith(requestManipulator aurestclientapi.RequestManipulatorCallback, c
 		return nil, err
 	}
 
-	requestLoggingClient := NewRequestLoggingWrapper(httpClient)
+	requestLoggingClient := aurestlogging.New(httpClient)
 
 	circuitBreakerClient := aurestbreaker.New(requestLoggingClient,
 		circuitBreakerName,

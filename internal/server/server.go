@@ -6,6 +6,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
@@ -40,8 +41,9 @@ func CreateRouter(i interaction.Interactor, conf config.SecurityConfig) chi.Rout
 	router := chi.NewRouter()
 
 	router.Use(chimiddleware.Recoverer)
-	router.Use(middleware.RequestIdMiddleware())
-	router.Use(middleware.LogRequestIdMiddleware())
+	router.Use(middleware.RequestIdMiddleware)
+	router.Use(loggermiddleware.AddZerologLoggerToContext)
+	router.Use(middleware.RequestLoggerMiddleware)
 	router.Use(middleware.CorsHeadersMiddleware(&conf))
 	router.Use(middleware.CheckRequestAuthorization(&conf))
 

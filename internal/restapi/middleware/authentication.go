@@ -70,8 +70,8 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			reqID := common.GetRequestID(ctx)
-			logger := logging.WithRequestID(ctx, reqID)
+			reqID := logging.GetRequestID(ctx)
+			logger := logging.LoggerFromContext(ctx)
 
 			// check for api key first
 			if token := getApiKeyFromHeader(r); token != "" {
