@@ -52,7 +52,7 @@ type AttendeeIdList struct {
 func (i *Impl) PaymentsChanged(ctx context.Context, debitorId uint) error {
 	url := fmt.Sprintf("%s/api/rest/v1/attendees/%d/payments-changed", i.baseUrl, debitorId)
 	response := aurestclientapi.ParsedResponse{}
-	err := i.paymentsChangedClient.Perform(ctx, http.MethodGet, url, nil, &response)
+	err := i.paymentsChangedClient.Perform(ctx, http.MethodPost, url, nil, &response)
 	return downstreams.ErrByStatus(err, response.Status)
 }
 
