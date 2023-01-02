@@ -52,6 +52,225 @@ func seedDB(db database.Repository, transactions []entities.Transaction) {
 	}
 }
 
+func TestGetTransactionsForDebitor(t *testing.T) {
+	type args struct {
+		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
+		query                 entities.TransactionQuery
+		ctx                   context.Context
+		seed                  []entities.Transaction
+	}
+
+	type expected struct {
+		transactions []entities.Transaction
+		err          error
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should return forbidden, when context doesn't contain any permissions",
+			args: args{
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1}, nil
+				},
+				query: entities.TransactionQuery{
+					DebitorID: 1,
+				},
+				ctx:  context.Background(),
+				seed: []entities.Transaction{},
+			},
+			expected: expected{
+				transactions: nil,
+				err:          apierrors.NewForbidden("unable to determine the request permissions"),
+			},
+		},
+		{
+			name: "should return error when attendee service call was not succesfull",
+			args: args{
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return nil, errors.New("service call failed")
+				},
+				query: entities.TransactionQuery{
+					DebitorID: 1,
+				},
+				ctx:  attendeeCtx(),
+				seed: []entities.Transaction{},
+			},
+			expected: expected{
+				transactions: nil,
+				err:          errors.New("service call failed"),
+			},
+		},
+		{
+			name: "should return forbidden error, when attendee ID was not found in response",
+			args: args{
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{2}, nil
+				},
+				query: entities.TransactionQuery{
+					DebitorID: 1,
+				},
+				ctx:  attendeeCtx(),
+				seed: []entities.Transaction{},
+			},
+			expected: expected{
+				transactions: nil,
+				err:          apierrors.NewForbidden("subject 1234567890 may not retrieve transactions for debitor 1"),
+			},
+		},
+		{
+			name: "should return debitor transactions, which are not deleted",
+			args: args{
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1}, nil
+				},
+				query: entities.TransactionQuery{
+					DebitorID: 1,
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "1",
+						TransactionType:   entities.TransactionTypeDue,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+					{
+						DebitorID: 1,
+						Model: gorm.Model{
+							DeletedAt: gorm.DeletedAt{Time: time.Now(), Valid: true},
+						},
+						TransactionID:     "2",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusDeleted,
+					},
+					{
+						DebitorID:         1,
+						TransactionID:     "3",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+				},
+			},
+			expected: expected{
+				transactions: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "1",
+						TransactionType:   entities.TransactionTypeDue,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+					{
+						DebitorID:         1,
+						TransactionID:     "3",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+				},
+				err: nil,
+			},
+		},
+		{
+			name: "should return debitor transactions, which are deleted",
+			args: args{
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1}, nil
+				},
+				query: entities.TransactionQuery{
+					DebitorID: 1,
+				},
+				ctx: adminCtx(),
+				seed: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "1",
+						TransactionType:   entities.TransactionTypeDue,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+					{
+						DebitorID: 1,
+						Model: gorm.Model{
+							DeletedAt: gorm.DeletedAt{Time: time.Now(), Valid: true},
+						},
+						TransactionID:     "2",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusDeleted,
+					},
+					{
+						DebitorID:         1,
+						TransactionID:     "3",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+				},
+			},
+			expected: expected{
+				transactions: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "1",
+						TransactionType:   entities.TransactionTypeDue,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+					{
+						DebitorID:         1,
+						TransactionID:     "2",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusDeleted,
+					},
+					{
+						DebitorID:         1,
+						TransactionID:     "3",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusValid,
+					},
+				},
+				err: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			db := inmemory.NewInMemoryProvider()
+			seedDB(db, tt.args.seed)
+
+			asm := &AttendeeServiceMock{
+				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
+			}
+
+			i, err := NewServiceInteractor(db, asm, &CncrdAdapterMock{})
+			require.NoError(t, err)
+
+			rt, err := i.GetTransactionsForDebitor(tt.args.ctx, tt.args.query)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, rt)
+			} else {
+				omitModelTransactions := make([]entities.Transaction, len(rt))
+				for i, tr := range rt {
+					tr := tr
+					tr.Model = gorm.Model{}
+					omitModelTransactions[i] = tr
+				}
+				require.NoError(t, err)
+
+				for _, tr := range omitModelTransactions {
+					require.Contains(t, tt.expected.transactions, tr)
+				}
+
+			}
+
+		})
+	}
+
+}
+
 func TestCreateTransaction(t *testing.T) {
 
 	type args struct {

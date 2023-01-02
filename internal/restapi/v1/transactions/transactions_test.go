@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +13,9 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
+	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/require"
@@ -26,6 +28,44 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
+
+func apiKeyCtx() context.Context {
+	return context.WithValue(context.Background(), common.CtxKeyAPIKey{}, "123456")
+}
+
+func adminCtx() context.Context {
+	return contextWithClaims(&common.AllClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject: "1234567890",
+		},
+		CustomClaims: common.CustomClaims{
+			Global: common.GlobalClaims{
+				Roles: []string{"admin"},
+			},
+		},
+	})
+}
+
+func attendeeCtx() context.Context {
+	return contextWithClaims(&common.AllClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject: "1234567890",
+		},
+		CustomClaims: common.CustomClaims{
+			Global: common.GlobalClaims{
+				Roles: []string{""},
+			},
+		},
+	})
+}
+
+func contextWithClaims(claims *common.AllClaims) context.Context {
+	ctx := context.Background()
+	ctx = context.WithValue(ctx, common.CtxKeyClaims{}, claims)
+	ctx = context.WithValue(ctx, common.CtxKeyToken{}, "token12345")
+
+	return ctx
+}
 
 type statusCodeResponseWriter struct {
 	contents   []byte
@@ -141,6 +181,7 @@ func TestHandleTransactions(t *testing.T) {
 		db        database.Repository
 		populator func(*testing.T, database.Repository)
 		request   GetTransactionsRequest
+		ctx       context.Context
 	}
 
 	type expected struct {
@@ -156,7 +197,11 @@ func TestHandleTransactions(t *testing.T) {
 		{
 			name: "Should return transactions for debitor ID",
 			args: args{
-				att:   &AttendeeServiceMock{},
+				att: &AttendeeServiceMock{
+					ListMyRegistrationIdsFunc: func(ctx context.Context) ([]int64, error) {
+						return []int64{1}, nil
+					},
+				},
 				cncrd: &CncrdAdapterMock{},
 				db:    inmemory.NewInMemoryProvider(),
 				populator: func(t *testing.T, db database.Repository) {
@@ -165,6 +210,7 @@ func TestHandleTransactions(t *testing.T) {
 				request: GetTransactionsRequest{
 					DebitorID: 1,
 				},
+				ctx: attendeeCtx(),
 			},
 			expected: expected{
 				response: &GetTransactionsResponse{
@@ -192,6 +238,7 @@ func TestHandleTransactions(t *testing.T) {
 				request: GetTransactionsRequest{
 					TransactionIdentifier: "1234567890",
 				},
+				ctx: adminCtx(),
 			},
 			expected: expected{
 				response: &GetTransactionsResponse{
@@ -214,6 +261,7 @@ func TestHandleTransactions(t *testing.T) {
 				request: GetTransactionsRequest{
 					EffectiveFrom: newEffDate(t, "2022-12-20"),
 				},
+				ctx: adminCtx(),
 			},
 			expected: expected{
 				response: &GetTransactionsResponse{
@@ -244,6 +292,7 @@ func TestHandleTransactions(t *testing.T) {
 				request: GetTransactionsRequest{
 					EffectiveBefore: newEffDate(t, "2022-12-20"),
 				},
+				ctx: adminCtx(),
 			},
 			expected: expected{
 				response: &GetTransactionsResponse{
@@ -270,7 +319,6 @@ func TestHandleTransactions(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		ctx := context.Background()
 
 		tt.args.populator(t, tt.args.db)
 
@@ -288,7 +336,7 @@ func TestHandleTransactions(t *testing.T) {
 
 		fn := MakeGetTransactionsEndpoint(i)
 
-		resp, err := fn(ctx, req, logger)
+		resp, err := fn(tt.args.ctx, req, logger)
 		require.NoError(t, err)
 
 		require.Len(t, resp.Payload, len(tt.expected.response.Payload))

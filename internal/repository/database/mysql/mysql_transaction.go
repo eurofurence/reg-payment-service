@@ -109,6 +109,34 @@ func (m *mysqlConnector) GetTransactionsByFilter(ctx context.Context, query enti
 	return transactions, nil
 }
 
+func (m *mysqlConnector) GetAdminTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
+	var transactions []entities.Transaction
+
+	tCtx, cancel := context.WithTimeout(ctx, time.Second*20)
+	defer cancel()
+
+	db := m.db.WithContext(tCtx).
+		Where(&entities.Transaction{
+			DebitorID:     query.DebitorID,
+			TransactionID: query.TransactionIdentifier,
+		})
+
+	if !query.EffectiveFrom.IsZero() {
+		db.Where("effective_date >= ?", query.EffectiveFrom)
+	}
+
+	if !query.EffectiveBefore.IsZero() {
+		db.Where("effective_date < ?", query.EffectiveBefore)
+	}
+
+	res := db.Unscoped().Find(&transactions)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+
+	return transactions, nil
+}
+
 func (m *mysqlConnector) GetValidTransactionsForDebitor(ctx context.Context, debitorID int64) ([]entities.Transaction, error) {
 	var transactions []entities.Transaction
 

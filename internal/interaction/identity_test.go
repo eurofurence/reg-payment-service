@@ -165,7 +165,7 @@ func TestNewIdentityManager(t *testing.T) {
 			require.Equal(t, tt.expected.isAPITokenCall, mgr.IsAPITokenCall())
 			require.Equal(t, tt.expected.isRegisteredUser, mgr.IsRegisteredUser())
 			require.Equal(t, tt.expected.roles, mgr.roles)
-			require.Equal(t, tt.expected.subject, mgr.subject)
+			require.Equal(t, tt.expected.subject, mgr.Subject())
 
 		})
 	}
