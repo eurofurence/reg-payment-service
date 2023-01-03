@@ -26,6 +26,10 @@ func (i *IdentityManager) IsRegisteredUser() bool {
 	return i.isRegisteredUser && i.subject != ""
 }
 
+func (i *IdentityManager) Subject() string {
+	return i.subject
+}
+
 func NewIdentityManager(ctx context.Context) *IdentityManager {
 	manager := &IdentityManager{}
 	if _, ok := ctx.Value(common.CtxKeyAPIKey{}).(string); ok {

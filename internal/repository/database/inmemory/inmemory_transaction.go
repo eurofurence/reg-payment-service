@@ -59,6 +59,10 @@ func (m *inmemoryProvider) GetTransactionByTransactionIDAndType(ctx context.Cont
 func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	result := make([]entities.Transaction, 0)
 	for _, t := range m.transactions {
+		if !t.DeletedAt.Time.IsZero() {
+			continue
+		}
+
 		if query.DebitorID != 0 && t.DebitorID != query.DebitorID {
 			continue
 		}
@@ -73,8 +77,33 @@ func (m *inmemoryProvider) GetTransactionsByFilter(ctx context.Context, query en
 			// if !(20 < 28) break
 			continue
 		}
+
 		result = append(result, t)
 	}
+	return result, nil
+}
+
+func (m *inmemoryProvider) GetAdminTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
+	result := make([]entities.Transaction, 0)
+	for _, t := range m.transactions {
+		if query.DebitorID != 0 && t.DebitorID != query.DebitorID {
+			continue
+		}
+		if query.TransactionIdentifier != "" && t.TransactionID != query.TransactionIdentifier {
+			continue
+		}
+
+		if !query.EffectiveFrom.IsZero() && query.EffectiveFrom.After(t.EffectiveDate.Time) {
+			continue
+		}
+		if !query.EffectiveBefore.IsZero() && !t.EffectiveDate.Time.Before(query.EffectiveBefore) {
+			// if !(20 < 28) break
+			continue
+		}
+
+		result = append(result, t)
+	}
+
 	return result, nil
 }
 

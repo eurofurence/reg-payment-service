@@ -18,7 +18,30 @@ import (
 )
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
-	return s.store.GetTransactionsByFilter(ctx, query)
+	logger := logging.LoggerFromContext(ctx)
+	mgr := NewIdentityManager(ctx)
+
+	if mgr.IsRegisteredUser() {
+		regIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
+		if err != nil {
+			logger.Error("could not call the attendee service. [error]: %v", err)
+			return nil, err
+		}
+
+		if !containsDebitor(regIDs, query.DebitorID) {
+			return nil, apierrors.NewForbidden(fmt.Sprintf("subject %s may not retrieve transactions for debitor %d", mgr.Subject(), query.DebitorID))
+		}
+
+		// will not return deleted transactions
+		return s.store.GetTransactionsByFilter(ctx, query)
+	}
+
+	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
+		// return transactions in any state
+		return s.store.GetAdminTransactionsByFilter(ctx, query)
+	}
+
+	return nil, apierrors.NewForbidden("unable to determine the request permissions")
 }
 
 func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error) {

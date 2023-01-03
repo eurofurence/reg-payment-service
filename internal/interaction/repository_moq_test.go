@@ -29,6 +29,9 @@ var _ database.Repository = &RepositoryMock{}
 //			DeleteTransactionFunc: func(ctx context.Context, tr entities.Transaction) error {
 //				panic("mock out the DeleteTransaction method")
 //			},
+//			GetAdminTransactionsByFilterFunc: func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
+//				panic("mock out the GetAdminTransactionsByFilter method")
+//			},
 //			GetTransactionByTransactionIDAndTypeFunc: func(ctx context.Context, transactionID string, tType entities.TransactionType) (*entities.Transaction, error) {
 //				panic("mock out the GetTransactionByTransactionIDAndType method")
 //			},
@@ -44,7 +47,7 @@ var _ database.Repository = &RepositoryMock{}
 //			MigrateFunc: func() error {
 //				panic("mock out the Migrate method")
 //			},
-//			QueryOutstandingDuesForDebitorFunc: func(ctx context.Context, debutorID int64) (int64, error) {
+//			QueryOutstandingDuesForDebitorFunc: func(ctx context.Context, debitorID int64) (int64, error) {
 //				panic("mock out the QueryOutstandingDuesForDebitor method")
 //			},
 //			UpdateTransactionFunc: func(ctx context.Context, tr entities.Transaction, historize bool) error {
@@ -66,6 +69,9 @@ type RepositoryMock struct {
 	// DeleteTransactionFunc mocks the DeleteTransaction method.
 	DeleteTransactionFunc func(ctx context.Context, tr entities.Transaction) error
 
+	// GetAdminTransactionsByFilterFunc mocks the GetAdminTransactionsByFilter method.
+	GetAdminTransactionsByFilterFunc func(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error)
+
 	// GetTransactionByTransactionIDAndTypeFunc mocks the GetTransactionByTransactionIDAndType method.
 	GetTransactionByTransactionIDAndTypeFunc func(ctx context.Context, transactionID string, tType entities.TransactionType) (*entities.Transaction, error)
 
@@ -82,7 +88,7 @@ type RepositoryMock struct {
 	MigrateFunc func() error
 
 	// QueryOutstandingDuesForDebitorFunc mocks the QueryOutstandingDuesForDebitor method.
-	QueryOutstandingDuesForDebitorFunc func(ctx context.Context, debutorID int64) (int64, error)
+	QueryOutstandingDuesForDebitorFunc func(ctx context.Context, debitorID int64) (int64, error)
 
 	// UpdateTransactionFunc mocks the UpdateTransaction method.
 	UpdateTransactionFunc func(ctx context.Context, tr entities.Transaction, historize bool) error
@@ -109,6 +115,13 @@ type RepositoryMock struct {
 			Ctx context.Context
 			// Tr is the tr argument value.
 			Tr entities.Transaction
+		}
+		// GetAdminTransactionsByFilter holds details about calls to the GetAdminTransactionsByFilter method.
+		GetAdminTransactionsByFilter []struct {
+			// Ctx is the ctx argument value.
+			Ctx context.Context
+			// Query is the query argument value.
+			Query entities.TransactionQuery
 		}
 		// GetTransactionByTransactionIDAndType holds details about calls to the GetTransactionByTransactionIDAndType method.
 		GetTransactionByTransactionIDAndType []struct {
@@ -147,8 +160,8 @@ type RepositoryMock struct {
 		QueryOutstandingDuesForDebitor []struct {
 			// Ctx is the ctx argument value.
 			Ctx context.Context
-			// DebutorID is the debutorID argument value.
-			DebutorID int64
+			// DebitorID is the debitorID argument value.
+			DebitorID int64
 		}
 		// UpdateTransaction holds details about calls to the UpdateTransaction method.
 		UpdateTransaction []struct {
@@ -163,6 +176,7 @@ type RepositoryMock struct {
 	lockCreateTransaction                    sync.RWMutex
 	lockCreateTransactionLog                 sync.RWMutex
 	lockDeleteTransaction                    sync.RWMutex
+	lockGetAdminTransactionsByFilter         sync.RWMutex
 	lockGetTransactionByTransactionIDAndType sync.RWMutex
 	lockGetTransactionLogByID                sync.RWMutex
 	lockGetTransactionsByFilter              sync.RWMutex
@@ -286,6 +300,46 @@ func (mock *RepositoryMock) DeleteTransactionCalls() []struct {
 	mock.lockDeleteTransaction.RLock()
 	calls = mock.calls.DeleteTransaction
 	mock.lockDeleteTransaction.RUnlock()
+	return calls
+}
+
+// GetAdminTransactionsByFilter calls GetAdminTransactionsByFilterFunc.
+func (mock *RepositoryMock) GetAdminTransactionsByFilter(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
+	callInfo := struct {
+		Ctx   context.Context
+		Query entities.TransactionQuery
+	}{
+		Ctx:   ctx,
+		Query: query,
+	}
+	mock.lockGetAdminTransactionsByFilter.Lock()
+	mock.calls.GetAdminTransactionsByFilter = append(mock.calls.GetAdminTransactionsByFilter, callInfo)
+	mock.lockGetAdminTransactionsByFilter.Unlock()
+	if mock.GetAdminTransactionsByFilterFunc == nil {
+		var (
+			transactionsOut []entities.Transaction
+			errOut          error
+		)
+		return transactionsOut, errOut
+	}
+	return mock.GetAdminTransactionsByFilterFunc(ctx, query)
+}
+
+// GetAdminTransactionsByFilterCalls gets all the calls that were made to GetAdminTransactionsByFilter.
+// Check the length with:
+//
+//	len(mockedRepository.GetAdminTransactionsByFilterCalls())
+func (mock *RepositoryMock) GetAdminTransactionsByFilterCalls() []struct {
+	Ctx   context.Context
+	Query entities.TransactionQuery
+} {
+	var calls []struct {
+		Ctx   context.Context
+		Query entities.TransactionQuery
+	}
+	mock.lockGetAdminTransactionsByFilter.RLock()
+	calls = mock.calls.GetAdminTransactionsByFilter
+	mock.lockGetAdminTransactionsByFilter.RUnlock()
 	return calls
 }
 
@@ -484,13 +538,13 @@ func (mock *RepositoryMock) MigrateCalls() []struct {
 }
 
 // QueryOutstandingDuesForDebitor calls QueryOutstandingDuesForDebitorFunc.
-func (mock *RepositoryMock) QueryOutstandingDuesForDebitor(ctx context.Context, debutorID int64) (int64, error) {
+func (mock *RepositoryMock) QueryOutstandingDuesForDebitor(ctx context.Context, debitorID int64) (int64, error) {
 	callInfo := struct {
 		Ctx       context.Context
-		DebutorID int64
+		DebitorID int64
 	}{
 		Ctx:       ctx,
-		DebutorID: debutorID,
+		DebitorID: debitorID,
 	}
 	mock.lockQueryOutstandingDuesForDebitor.Lock()
 	mock.calls.QueryOutstandingDuesForDebitor = append(mock.calls.QueryOutstandingDuesForDebitor, callInfo)
@@ -502,7 +556,7 @@ func (mock *RepositoryMock) QueryOutstandingDuesForDebitor(ctx context.Context, 
 		)
 		return nOut, errOut
 	}
-	return mock.QueryOutstandingDuesForDebitorFunc(ctx, debutorID)
+	return mock.QueryOutstandingDuesForDebitorFunc(ctx, debitorID)
 }
 
 // QueryOutstandingDuesForDebitorCalls gets all the calls that were made to QueryOutstandingDuesForDebitor.
@@ -511,11 +565,11 @@ func (mock *RepositoryMock) QueryOutstandingDuesForDebitor(ctx context.Context, 
 //	len(mockedRepository.QueryOutstandingDuesForDebitorCalls())
 func (mock *RepositoryMock) QueryOutstandingDuesForDebitorCalls() []struct {
 	Ctx       context.Context
-	DebutorID int64
+	DebitorID int64
 } {
 	var calls []struct {
 		Ctx       context.Context
-		DebutorID int64
+		DebitorID int64
 	}
 	mock.lockQueryOutstandingDuesForDebitor.RLock()
 	calls = mock.calls.QueryOutstandingDuesForDebitor
