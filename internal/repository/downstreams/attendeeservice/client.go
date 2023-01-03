@@ -65,5 +65,9 @@ func (i *Impl) ListMyRegistrationIds(ctx context.Context) ([]int64, error) {
 		Body: &bodyDto,
 	}
 	err := i.listMyRegistrationsClient.Perform(ctx, http.MethodGet, url, nil, &response)
+	if response.Status == http.StatusNotFound {
+		// not really an error - this user has no registrations
+		return make([]int64, 0), nil
+	}
 	return bodyDto.Ids, downstreams.ErrByStatus(err, response.Status)
 }
