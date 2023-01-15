@@ -407,10 +407,11 @@ func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transactio
 
 func (s *serviceInteractor) createPaymentLink(ctx context.Context, tran entities.Transaction) (string, error) {
 	response, err := s.cncrdClient.CreatePaylink(ctx, cncrdadapter.PaymentLinkRequestDto{
-		DebitorId: tran.DebitorID,
-		Currency:  tran.Amount.ISOCurrency,
-		VatRate:   tran.Amount.VatRate,
-		AmountDue: tran.Amount.GrossCent,
+		ReferenceId: tran.TransactionID,
+		DebitorId:   tran.DebitorID,
+		Currency:    tran.Amount.ISOCurrency,
+		VatRate:     tran.Amount.VatRate,
+		AmountDue:   tran.Amount.GrossCent,
 	})
 
 	if err != nil {

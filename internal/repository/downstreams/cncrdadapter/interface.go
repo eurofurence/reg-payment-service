@@ -10,10 +10,11 @@ type CncrdAdapter interface {
 }
 
 type PaymentLinkRequestDto struct {
-	DebitorId int64   `json:"debitor_id"`
-	AmountDue int64   `json:"amount_due"`
-	Currency  string  `json:"currency"`
-	VatRate   float64 `json:"vat_rate"`
+	ReferenceId string  `json:"reference_id"`
+	DebitorId   int64   `json:"debitor_id"`
+	AmountDue   int64   `json:"amount_due"`
+	Currency    string  `json:"currency"`
+	VatRate     float64 `json:"vat_rate"`
 }
 
 type PaymentLinkDto struct {
