@@ -784,6 +784,150 @@ func TestUpdateTransactionRequestHandler(t *testing.T) {
 	}
 }
 
+func TestInitiatePaymentRequestHandler(t *testing.T) {
+	type expected struct {
+		err error
+		req *InitiatePaymentRequest
+	}
+
+	type args struct {
+		withoutID   bool
+		debitorID   int64
+		invalidType *struct {
+			Foo string `json:"foo"`
+			Bar int    `json:"bar"`
+		}
+		customJSON []byte
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should successfully create request with valid data",
+			args: args{
+				debitorID: 10,
+			},
+			expected: expected{
+				err: nil,
+				req: &InitiatePaymentRequest{
+					TransactionInitiator: TransactionInitiator{
+						DebitorID: 10,
+					},
+				},
+			},
+		},
+		{
+			name: "should fail with bad request when debitor ID is zero",
+			args: args{
+				debitorID: 0,
+			},
+			expected: expected{
+				err: errors.New("invalid value 0 for debitor. Value must be greater than zero"),
+				req: nil,
+			},
+		},
+		{
+			name: "should fail with bad request when debitor ID is less than zero",
+			args: args{
+				debitorID: -1,
+			},
+			expected: expected{
+				err: errors.New("invalid value -1 for debitor. Value must be greater than zero"),
+				req: nil,
+			},
+		},
+		{
+			name: "should fail with bad request when request body is nil",
+			args: args{
+				withoutID: true,
+			},
+			expected: expected{
+				err: io.EOF,
+				req: nil,
+			},
+		},
+		{
+			name: "should fail with bad request when request body contains invalid json",
+			args: args{
+				withoutID: true,
+				invalidType: &struct {
+					Foo string `json:"foo"`
+					Bar int    `json:"bar"`
+				}{
+					Foo: "Hello",
+					Bar: 10,
+				},
+			},
+			expected: expected{
+				err: errors.New("invalid value 0 for debitor. Value must be greater than zero"),
+				req: nil,
+			},
+		},
+		{
+			name: "should fail with bad request when request body contains wrong json",
+			args: args{
+				withoutID:  true,
+				customJSON: []byte(`invalid json`),
+			},
+			expected: expected{
+				err: errors.New("invalid character 'i' looking for beginning of value"),
+				req: nil,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			type requestType struct {
+				DebitorID int64 `json:"debitor_id"`
+			}
+
+			var r *http.Request
+
+			if tt.args.withoutID {
+				if len(tt.args.customJSON) == 0 && tt.args.invalidType != nil {
+
+					jsonBytes, err := json.Marshal(&tt.args.invalidType)
+					require.NoError(t, err)
+
+					b := bytes.NewBuffer(jsonBytes)
+					r = httptest.NewRequest(http.MethodPost, "http://example.com/transaction/{id}", b)
+				} else if len(tt.args.customJSON) > 0 {
+					b := bytes.NewBuffer(tt.args.customJSON)
+					r = httptest.NewRequest(http.MethodPost, "http://example.com/transaction/{id}", b)
+				} else {
+					r = httptest.NewRequest(http.MethodPost, "http://example.com/transaction/{id}", nil)
+				}
+			} else {
+				rt := requestType{
+					DebitorID: tt.args.debitorID,
+				}
+				jsonBytes, err := json.Marshal(&rt)
+				require.NoError(t, err)
+				b := bytes.NewBuffer(jsonBytes)
+				r = httptest.NewRequest(http.MethodPost, "http://example.com/transaction/{id}", b)
+			}
+
+			req, err := initiatePaymentRequestHandler(r)
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, req)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.expected.req, req)
+			}
+		})
+	}
+}
+
+func TestInitiatePaymentResponseHandler(t *testing.T) {
+	// TODO
+}
+
 func toTransactionRequestBody(req Transaction) io.Reader {
 	if reflect.ValueOf(req).IsZero() {
 		return nil

@@ -903,6 +903,171 @@ func TestUpdateTransaction(t *testing.T) {
 	// TODO
 }
 
+func TestCreateTransactionForOutstandingDues(t *testing.T) {
+	type args struct {
+		paymentsChangedFunc   func(ctx context.Context, debitorId uint) error
+		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
+		createPaylinkFunc     func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error)
+		debitorID             int64
+		ctx                   context.Context
+		seed                  []entities.Transaction
+	}
+
+	type expected struct {
+		createPayLink  bool
+		expectedAmount int64
+		err            error
+	}
+
+	tests := []struct {
+		name     string
+		args     args
+		expected expected
+	}{
+		{
+			name: "should return error when no valid transactions were found",
+			args: args{
+				debitorID: 10,
+			},
+			expected: expected{
+				err: apierrors.NewNotFound("no valid dues found in order to initiate payment"),
+			},
+		},
+		{
+			name: "should return error when no outstanding dues exist",
+			args: args{
+				debitorID: 10,
+				seed: []entities.Transaction{
+					newTransaction(10, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusValid, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+					newTransaction(10, "1234", entities.TransactionTypePayment, entities.PaymentMethodCredit, entities.TransactionStatusValid, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewNotFound("no outstanding dues for debitor"),
+			},
+		},
+		{
+			name: "should return error context does not contain a valid token",
+			args: args{
+				debitorID: 10,
+				seed: []entities.Transaction{
+					newTransaction(10, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusValid, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+				},
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("unable to determine the request permissions"),
+			},
+		},
+		{
+			name: "should return error when pending transactions exist",
+			args: args{
+				debitorID: 10,
+				ctx:       attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(10, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusValid, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+					newTransaction(10, "1234", entities.TransactionTypePayment, entities.PaymentMethodCredit, entities.TransactionStatusPending, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{10}, nil
+				},
+			},
+			expected: expected{
+				err: apierrors.NewConflict("There are pending payments for attendee 10"),
+			},
+		},
+		{
+			name: "should create transaction with paylink and remaining amount",
+			args: args{
+				debitorID: 10,
+				ctx:       attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(10, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusValid, entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   200_00,
+						VatRate:     19.0,
+					}),
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{10}, nil
+				},
+				paymentsChangedFunc: func(ctx context.Context, debitorId uint) error {
+					return nil
+				},
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{
+						ReferenceId: "12345",
+						Link:        "abc123",
+					}, nil
+				},
+			},
+			expected: expected{
+				err:            nil,
+				createPayLink:  true,
+				expectedAmount: 200_00,
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			asm := &AttendeeServiceMock{
+				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
+				PaymentsChangedFunc:       tt.args.paymentsChangedFunc,
+			}
+
+			ccm := &CncrdAdapterMock{
+				CreatePaylinkFunc: tt.args.createPaylinkFunc,
+			}
+
+			db := inmemory.NewInMemoryProvider()
+			seedDB(db, tt.args.seed)
+
+			i, err := NewServiceInteractor(db, asm, ccm)
+			require.NoError(t, err)
+
+			if tt.args.ctx == nil {
+				tt.args.ctx = context.TODO()
+			}
+
+			res, err := i.CreateTransactionForOutstandingDues(tt.args.ctx, tt.args.debitorID)
+
+			if tt.expected.err != nil {
+				require.EqualError(t, err, tt.expected.err.Error())
+				require.Nil(t, res)
+			} else {
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				if tt.expected.createPayLink {
+					require.NotEmpty(t, res.PaymentStartUrl)
+				}
+
+				require.Equal(t, tt.expected.expectedAmount, res.Amount.GrossCent)
+			}
+
+		})
+	}
+}
+
 func newTransaction(debID int64, tranID string,
 	pType entities.TransactionType,
 	method entities.PaymentMethod,
