@@ -101,7 +101,17 @@ func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Upd
 
 func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[InitiatePaymentRequest, InitiatePaymentResponse] {
 	return func(ctx context.Context, request *InitiatePaymentRequest, logger logging.Logger) (*InitiatePaymentResponse, error) {
-		return nil, nil
+		logger.Debug("initiating payment for debitor %d", request.TransactionInitiator.DebitorID)
+		res, err := i.CreateTransactionForOutstandingDues(ctx, request.TransactionInitiator.DebitorID)
+
+		if err != nil {
+			return nil, err
+		}
+
+		return &InitiatePaymentResponse{
+			Transaction: ToV1Transaction(*res),
+		}, nil
+
 	}
 }
 
@@ -203,7 +213,7 @@ func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest
 	return &UpdateTransactionRequest{Transaction: tran}, nil
 }
 
-func updateTransactionResponseHandler(ctx context.Context, res *UpdateTransactionResponse, w http.ResponseWriter) error {
+func updateTransactionResponseHandler(ctx context.Context, _ *UpdateTransactionResponse, w http.ResponseWriter) error {
 	// Write status header without content here
 	w.WriteHeader(http.StatusNoContent)
 	return nil
@@ -216,12 +226,21 @@ func initiatePaymentRequestHandler(r *http.Request) (*InitiatePaymentRequest, er
 		return nil, err
 	}
 
+	if payReq.TransactionInitiator.DebitorID <= 0 {
+		return nil, fmt.Errorf("invalid value %d for debitor. Value must be greater than zero", payReq.TransactionInitiator.DebitorID)
+	}
+
 	return &payReq, nil
 }
 
 func initiatePaymentResponseHandler(ctx context.Context, res *InitiatePaymentResponse, w http.ResponseWriter) error {
-	// TODO
-	return nil
+	if res == nil {
+		return errors.New("invalid response - cannot provide transaction information")
+	}
+	w.Header().Add(headers.Location, fmt.Sprintf("api/rest/v1/transactions/%s", res.Transaction.TransactionIdentifier))
+
+	w.WriteHeader(http.StatusCreated)
+	return json.NewEncoder(w).Encode(res)
 }
 
 func validateTransaction(t *Transaction) error {

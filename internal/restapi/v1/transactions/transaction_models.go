@@ -6,29 +6,6 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-type InitiatePaymentRequest struct {
-	TransactionInitiator TransactionInitiator
-}
-
-type InitiatePaymentResponse struct{}
-
-// GetTransactionsRequest will contain all information that will be sent from the
-// client during calling the GetTransactions endpoint
-type GetTransactionsRequest struct {
-	// description: The id of a debitor to filter by
-	DebitorID int64
-	// filter by transaction_identifier
-	TransactionIdentifier string
-	// filter by effective date (inclusive) lower bound
-	EffectiveFrom time.Time
-	// filter by effective date (exclusive) upper bound - this makes it easy to get everything in a given month
-	EffectiveBefore time.Time
-}
-
-type GetTransactionsResponse struct {
-	Payload []Transaction `json:"payload"`
-}
-
 type Amount struct {
 	// Currency is the ISO 4217 currency code
 	Currency string `json:"currency"`
@@ -47,20 +24,56 @@ type StatusHistory struct {
 	ChangeDate time.Time                  `json:"change_date"`
 }
 
-// CreateTrasactionRequest contains all information to create a new transaction for a given debitor
-type CreateTransactionRequest struct {
-	Transaction Transaction `json:"transaction"`
-}
+// request and response types
+type (
+	// GetTransactionsRequest will contain all information that will be sent from the
+	// client during calling the GetTransactions endpoint
+	GetTransactionsRequest struct {
+		// description: The id of a debitor to filter by
+		DebitorID int64
+		// filter by transaction_identifier
+		TransactionIdentifier string
+		// filter by effective date (inclusive) lower bound
+		EffectiveFrom time.Time
+		// filter by effective date (exclusive) upper bound - this makes it easy to get everything in a given month
+		EffectiveBefore time.Time
+	}
 
-type CreateTransactionResponse struct {
-	Transaction Transaction `json:"transaction"`
-}
+	// GetTransactionsResponse contains a number of transactions depending on the search criteria
+	// provided in the `GetTransactionsRequest`
+	GetTransactionsResponse struct {
+		Payload []Transaction `json:"payload"`
+	}
 
-type UpdateTransactionRequest struct {
-	Transaction Transaction `json:"transaction"`
-}
+	// CreateTrasactionRequest contains all information to create a new transaction for a given debitor
+	CreateTransactionRequest struct {
+		Transaction Transaction `json:"transaction"`
+	}
 
-type UpdateTransactionResponse struct{}
+	// CreateTransactionResponse contains the transaction, which was created through the request parameters
+	CreateTransactionResponse struct {
+		Transaction Transaction `json:"transaction"`
+	}
+
+	// UpdateTransactionRequest contains information to perform an update to a transaction.
+	// Based on the request permissions (JWT, API Token, Admin), the fields that may be altered may vary
+	UpdateTransactionRequest struct {
+		Transaction Transaction `json:"transaction"`
+	}
+
+	// UpdateTransactionResponse is am empty response as this endpoint yields no response
+	UpdateTransactionResponse struct{}
+
+	// InitiatePaymentRequest is used for a convenience endpoint to create a payment transaction with the default values.
+	InitiatePaymentRequest struct {
+		TransactionInitiator TransactionInitiator
+	}
+
+	// InitiatePaymentResponse contains the transaction, that was created through the request
+	InitiatePaymentResponse struct {
+		Transaction Transaction `json:"transaction"`
+	}
+)
 
 type Transaction struct {
 	DebitorID             int64                       `json:"debitor_id"`

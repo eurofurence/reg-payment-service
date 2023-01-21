@@ -3,7 +3,6 @@ package interaction
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -106,24 +105,25 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 }
 
 func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64) (*entities.Transaction, error) {
+	logging.LoggerFromContext(ctx)
 	validTransactions, err := s.store.GetValidTransactionsForDebitor(ctx, debitorID)
 	if err != nil {
-		return nil, err // TODO api error
+		return nil, err
 	}
 
 	if len(validTransactions) == 0 {
-		return nil, errors.New("no valid dues found in order to initiate payment") // TODO api error
+		return nil, apierrors.NewNotFound("no valid dues found in order to initiate payment")
 	}
 
 	first := validTransactions[0]
 
 	dues, err := s.store.QueryOutstandingDuesForDebitor(ctx, debitorID)
 	if err != nil {
-		return nil, err // TODO api error
+		return nil, err
 	}
 
 	if dues <= 0 {
-		return nil, errors.New("no outstanding dues for debitor") // TODO api error
+		return nil, apierrors.NewNotFound("no outstanding dues for debitor")
 	}
 
 	return s.CreateTransaction(ctx, &entities.Transaction{
