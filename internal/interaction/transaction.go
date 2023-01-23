@@ -3,6 +3,7 @@ package interaction
 import (
 	"context"
 	"crypto/rand"
+	"database/sql"
 	"fmt"
 	"math/big"
 	"reflect"
@@ -63,6 +64,11 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		}
 
 		tran.TransactionID = id
+	}
+
+	// default for effective date
+	if !tran.EffectiveDate.Valid {
+		tran.EffectiveDate = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 
 	mgr := NewIdentityManager(ctx)

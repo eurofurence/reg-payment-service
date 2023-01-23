@@ -206,9 +206,13 @@ func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest
 
 	tran.TransactionIdentifier = transactionID
 
-	if anyNotEmpty(tran.PaymentStartUrl, string(tran.Method), string(tran.TransactionType), tran.Comment) {
-		return nil, errors.New("updates on transactions may only change the status, payment processor information and due date")
-	}
+	/*
+		if anyNotEmpty(tran.PaymentStartUrl, string(tran.Method), string(tran.TransactionType), tran.Comment) {
+			// XXX TODO: anyNotEmpty doesn't compare old value vs new value, it complains as soon as there is a value.
+			logging.LoggerFromContext(r.Context()).Warn("missing value. Given: link=%v method=%v type=%v comment=%v", tran.PaymentStartUrl, string(tran.Method), string(tran.TransactionType), tran.Comment)
+			return nil, errors.New("updates on transactions may only change the status, payment processor information and due date")
+		}
+	*/
 
 	return &UpdateTransactionRequest{Transaction: tran}, nil
 }
