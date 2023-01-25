@@ -199,9 +199,11 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 		}
 
 		// inform the attendee service that a transaction was deleted
-		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
-			// only log an error when the call was not successful but don't cause an internal server error
-			logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+		if tran.TransactionType == entities.TransactionTypePayment {
+			if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
+				// only log an error when the call was not successful but don't cause an internal server error
+				logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+			}
 		}
 
 		return nil
@@ -233,10 +235,12 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 		return err
 	}
 
-	// inform the attendee service that a transaction was updated
-	if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
-		// only log an error when the call was not successful but don't cause an internal server error
-		logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+	if tran.TransactionType == entities.TransactionTypePayment {
+		// inform the attendee service that a transaction was updated
+		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
+			// only log an error when the call was not successful but don't cause an internal server error
+			logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+		}
 	}
 
 	return nil
