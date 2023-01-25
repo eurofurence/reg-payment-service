@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"net/http"
 	"regexp"
+
+	"github.com/eurofurence/reg-payment-service/internal/logging"
 
 	"github.com/google/uuid"
 )

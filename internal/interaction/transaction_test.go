@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+
 	"github.com/eurofurence/reg-payment-service/internal/apierrors"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/entities"
@@ -16,9 +20,6 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 )
 
 //go:generate moq -pkg interaction -stub -out attendeeservice_moq_test.go ../repository/downstreams/attendeeservice/ AttendeeService
@@ -914,9 +915,10 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 	}
 
 	type expected struct {
-		createPayLink  bool
-		expectedAmount int64
-		err            error
+		createPayLink   bool
+		expectedAmount  int64
+		expectedComment string
+		err             error
 	}
 
 	tests := []struct {
@@ -1021,9 +1023,10 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 				},
 			},
 			expected: expected{
-				err:            nil,
-				createPayLink:  true,
-				expectedAmount: 200_00,
+				err:             nil,
+				createPayLink:   true,
+				expectedAmount:  200_00,
+				expectedComment: "manually initiated credit card payment",
 			},
 		},
 	}
@@ -1062,6 +1065,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 				}
 
 				require.Equal(t, tt.expected.expectedAmount, res.Amount.GrossCent)
+				require.Equal(t, tt.expected.expectedComment, res.Comment)
 			}
 
 		})

@@ -2,6 +2,7 @@ package logging
 
 import (
 	"context"
+
 	aulogging "github.com/StephanHCB/go-autumn-logging"
 	auzerolog "github.com/StephanHCB/go-autumn-logging-zerolog"
 	auloggingapi "github.com/StephanHCB/go-autumn-logging/api"

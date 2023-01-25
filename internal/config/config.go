@@ -37,11 +37,12 @@ type (
 	// ServiceConfig contains configuration values
 	// for service related tasks. E.g. URL to payment provider adapter
 	ServiceConfig struct {
-		Name                string   `yaml:"name"`
-		AttendeeService     string   `yaml:"attendee_service"`
-		ProviderAdapter     string   `yaml:"provider_adapter"`
-		TransactionIDPrefix string   `yaml:"transaction_id_prefix"`
-		AllowedCurrencies   []string `yaml:"allowed_currencies"`
+		Name                  string   `yaml:"name"`
+		AttendeeService       string   `yaml:"attendee_service"`
+		ProviderAdapter       string   `yaml:"provider_adapter"`
+		TransactionIDPrefix   string   `yaml:"transaction_id_prefix"`
+		AllowedCurrencies     []string `yaml:"allowed_currencies"`
+		DefaultPaymentComment string   `yaml:"payment_default_comment"`
 	}
 
 	// ServerConfig contains all values for

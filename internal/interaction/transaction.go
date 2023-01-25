@@ -105,6 +105,11 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 }
 
 func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64) (*entities.Transaction, error) {
+	appConfig, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	logging.LoggerFromContext(ctx)
 	validTransactions, err := s.store.GetValidTransactionsForDebitor(ctx, debitorID)
 	if err != nil {
@@ -126,11 +131,20 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 		return nil, apierrors.NewNotFound("no outstanding dues for debitor")
 	}
 
+	defaultCommentFunc := func() string {
+		if strings.TrimSpace(appConfig.Service.DefaultPaymentComment) == "" {
+			return "manually initiated credit card payment"
+		}
+
+		return appConfig.Service.DefaultPaymentComment
+	}
+
 	return s.CreateTransaction(ctx, &entities.Transaction{
 		DebitorID:         debitorID,
 		TransactionType:   entities.TransactionTypePayment,
 		PaymentMethod:     entities.PaymentMethodCredit,
 		TransactionStatus: entities.TransactionStatusTentative,
+		Comment:           defaultCommentFunc(),
 		Amount: entities.Amount{
 			ISOCurrency: first.Amount.ISOCurrency,
 			VatRate:     first.Amount.VatRate,
@@ -141,6 +155,7 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 
 func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
 	mgr := NewIdentityManager(ctx)
+	logger := logging.LoggerFromContext(ctx)
 
 	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {
 		return apierrors.NewForbidden("no permission to update transaction")
@@ -179,7 +194,20 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 		curTran.Deletion.Status = curTran.TransactionStatus
 		curTran.TransactionStatus = entities.TransactionStatusDeleted
 
-		return s.store.DeleteTransaction(ctx, curTran)
+		if err := s.store.DeleteTransaction(ctx, curTran); err != nil {
+			return err
+		}
+
+		// inform the attendee service that a transaction was deleted
+		if tran.TransactionType == entities.TransactionTypePayment {
+			if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
+				// only log an error when the call was not successful but don't cause an internal server error
+				logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+			}
+		}
+
+		return nil
+
 	}
 
 	if curTran.TransactionType == entities.TransactionTypeDue {
@@ -203,7 +231,19 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 		requireHistorization = true
 	}
 
-	return s.store.UpdateTransaction(ctx, *tran, requireHistorization)
+	if err := s.store.UpdateTransaction(ctx, *tran, requireHistorization); err != nil {
+		return err
+	}
+
+	if tran.TransactionType == entities.TransactionTypePayment {
+		// inform the attendee service that a transaction was updated
+		if err := s.attendeeClient.PaymentsChanged(ctx, uint(tran.DebitorID)); err != nil {
+			// only log an error when the call was not successful but don't cause an internal server error
+			logger.Error("error when calling the attendee service webhook. [error]: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *serviceInteractor) createTransactionWithElevatedAccess(
