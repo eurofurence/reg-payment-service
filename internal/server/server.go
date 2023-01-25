@@ -6,6 +6,7 @@ package server
 
 import (
 	"fmt"
+
 	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"

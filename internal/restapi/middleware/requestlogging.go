@@ -1,10 +1,11 @@
 package middleware
 
 import (
-	aulogging "github.com/StephanHCB/go-autumn-logging"
-	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 	"time"
+
+	aulogging "github.com/StephanHCB/go-autumn-logging"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // RequestLoggerMiddleware creates a HandlerFunc that logs each incoming request with a single line.

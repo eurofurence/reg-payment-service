@@ -4,11 +4,12 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
-	"github.com/stretchr/testify/require"
 )
 
 func TestNewServiceInteractor(t *testing.T) {

@@ -5,6 +5,7 @@ service:
   transaction_id_prefix: "EF2023"
   allowed_currencies:
     - 'EUR'
+  payment_default_comment: 'manually initiated credit card payment'
 server:
   port: 9092
   read_timeout_seconds: 30

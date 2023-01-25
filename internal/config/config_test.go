@@ -14,6 +14,7 @@ func TestUnmarshalConfig(t *testing.T) {
   name: 'TestServiceName'
   attendee_service: 'http://localhost:9091'
   provider_adapter: 'http://localhost:9097'
+  payment_default_comment: 'manually initiated credit card payment'
 server:
   port: 8080
   read_timeout_seconds: 30
@@ -63,6 +64,7 @@ logging:
 	require.Equal(t, "admin", conf.Security.Oidc.AdminRole)
 	require.True(t, conf.Security.Cors.DisableCors)
 	require.Equal(t, "http://localhost:8000,http://localhost:8001", conf.Security.Cors.AllowOrigin)
+	require.Equal(t, "manually initiated credit card payment", conf.Service.DefaultPaymentComment)
 }
 
 func TestUnmarshalConfigInvalid(t *testing.T) {
