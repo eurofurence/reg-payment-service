@@ -20,6 +20,7 @@ func createCorsHeadersHandler(next http.Handler, config *config.SecurityConfig) 
 			w.Header().Set(headers.AccessControlAllowOrigin, config.Cors.AllowOrigin)
 			w.Header().Set(headers.AccessControlAllowMethods, "POST, GET, OPTIONS, PUT, DELETE")
 			w.Header().Set(headers.AccessControlAllowHeaders, "content-type")
+			w.Header().Set(headers.AccessControlAllowCredentials, "true")
 			w.Header().Set(headers.AccessControlExposeHeaders, "Location, X-B3-TraceId")
 		}
 
