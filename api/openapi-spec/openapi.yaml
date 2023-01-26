@@ -379,7 +379,10 @@ components:
             Will always be set when an existing transaction is read, and it is not allowed to change this
             for existing transactions (the credit card processor uses this identifier).
             
-            TODO test that format is within length limitations of concardis, might need to shorten
+            A note about validation:
+            - for new transactions, verify format and prefix, but allow setting it so we can re-create transactions
+              that got dropped when a database transaction rolled back from the logs.
+            - for existing transactions, if set (optional), must match id from path, or else 400
           example: EF2022-000004-1028-200954-4711
         transaction_type:
           type: string
@@ -400,6 +403,7 @@ components:
           $ref: '#/components/schemas/Amount'
         comment:
           type: string
+          description: comment describing the payment, a default comment will be generated if not supplied, so in an existing transaction this will never be empty.
         status:
           $ref: '#/components/schemas/TransactionStatus'
         payment_processor_information:
@@ -416,11 +420,12 @@ components:
         due_date:
           type: string
           format: date-time
-          description: the time at which the dues should be paid at the latest, or you'll be considered overdue.
+          description: the time at which the dues should be paid at the latest, or you'll be considered overdue. Optional.
           example: '2022-08-24T14:22:28Z'
         creation_date:
           type: string
           format: date-time
+          description: the time at which the transaction was created. Read only, ignored when receiving a transaction, because this is just the database timestamp.
           example: '2022-06-24T11:12:13Z'
     TransactionInitiator:
       type: object

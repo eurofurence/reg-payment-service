@@ -74,6 +74,50 @@ type Transaction struct {
 	DueDate           sql.NullTime      `gorm:"type:date;NULL;default:NULL"`
 }
 
+// dues from attendee service:
+//
+// 	return paymentservice.Transaction{
+//	OK	DebitorID:       attendee.ID,
+//	OK	TransactionType: paymentservice.Due,
+//	OK	Method:          paymentservice.Internal,
+//		Amount: paymentservice.Amount{
+//	 OK		Currency:  config.Currency(),
+//	 OK		GrossCent: amount,
+//	 OK		VatRate:   vat,
+//		},
+//	OK	Comment:       comment,
+//	OK	Status:        paymentservice.Valid,
+//	OK	EffectiveDate: s.duesEffectiveDate(),
+//	opt	DueDate:       s.duesDueDate(),
+//	}
+
+// payments from concardis adapter:
+//
+// create if got lost:
+//
+// transaction := paymentservice.Transaction{
+//	OK	ID:        paylink.ReferenceID, `transaction_identifier`
+//	OK	DebitorID: debitor_id,
+//	OK	Type:      paymentservice.Payment, `transaction_type`
+//	OK	Method:    paymentservice.Credit, // XXX TODO: this is a guess. We use paylink for credit cards only, atm.
+//		Amount: paymentservice.Amount{
+//	 OK		GrossCent: paylink.Amount,
+//	 OK		Currency:  paylink.Currency,
+//	 OK		VatRate:   0, // TODO should set from payload
+//		},
+//	OK	Comment:       "Auto-created by cncrd adapter because the reference_id could not be found in the payment service.",
+//	OK	Status:        paymentservice.Pending,
+//	OK	EffectiveDate: today, // XXX TODO: this might be in the payload
+//	opt	DueDate:       today,
+//	}
+//
+// update if existing:
+//  - read via GET, then:
+//	transaction.Amount.GrossCent = paylink.Amount
+//	transaction.Amount.Currency = paylink.Currency
+//	transaction.Status = paymentservice.Pending // TODO fail if already in valid and values do not match (admin might have done this in the mean time)
+//	transaction.EffectiveDate = "xxx"
+
 type Amount struct {
 	ISOCurrency string `gorm:"type:varchar(3) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL; "`
 	GrossCent   int64

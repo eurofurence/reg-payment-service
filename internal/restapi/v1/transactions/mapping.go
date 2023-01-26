@@ -77,13 +77,15 @@ func ToTransactionEntity(tr Transaction) (*entities.Transaction, error) {
 	return tran, nil
 }
 
+const isoDateFormat = "2006-01-02"
+
 // Effective dates are only valid for an exact day without time.
 // We will parse them in the ISO 8601 (yyyy-mm-dd) format without time
 //
 // If `effDate` is emty, we will return a zero time instead
 func parseEffectiveDate(effDate string) (time.Time, error) {
 	if effDate != "" {
-		parsed, err := time.Parse("2006-01-02", effDate)
+		parsed, err := time.Parse(isoDateFormat, effDate)
 		if err != nil {
 			return time.Time{}, err
 		}
