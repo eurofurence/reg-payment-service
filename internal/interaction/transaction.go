@@ -65,6 +65,8 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 
 		tran.TransactionID = id
 	}
+	// TODO #48: if a transaction ID is provided, it should be validated against the allowed format (starts with configured prefix, and has the correct number of segments etc.)
+	// (because we allow create with transaction ID set)
 
 	// default for effective date
 	if !tran.EffectiveDate.Valid {
@@ -129,6 +131,7 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 	}
 
 	if dues <= 0 {
+		// TODO #48: according to openapi spec, this should be 400
 		return nil, apierrors.NewNotFound("no outstanding dues for debitor")
 	}
 
@@ -177,7 +180,7 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 		days := time.Now().UTC().Sub(curTran.CreatedAt.UTC()).Hours() / 24.0
 
 		if days > maxDaysForDeletion {
-			return apierrors.NewForbidden("unable to flag transaction as deleted after 3 days")
+			return apierrors.NewForbidden("unable to flag transaction as deleted after 3 days, please book a compensating transaction instead")
 		}
 
 		// update the deletion status with the current status that was
@@ -224,6 +227,9 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 	}
 
 	if tran.TransactionType == entities.TransactionTypePayment {
+		// TODO #48 for admin/API user, this check needs to be removed completely
+		// if we get a money or credit card transfer, we need to be able to book it or accounting will be incorrect
+		// the money is in our bank, so we must book it, no matter if it makes any sense that we got the payment
 		pending, err := s.arePendingPaymentsPresent(ctx, tran.DebitorID)
 		if err != nil {
 			return nil, err
@@ -309,7 +315,7 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 
 	// in error case: 400
 	// if partial payment || no outstanding dues
-	if !s.isValidPayment(currentTransactions, newTransaction, logger) {
+	if !s.isValidAttendeePayment(currentTransactions, newTransaction, logger) {
 		return apierrors.NewBadRequest("no outstanding dues or partial payment")
 	}
 
@@ -376,7 +382,7 @@ func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debit
 	return false, nil
 }
 
-func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transaction, newTran *entities.Transaction, logger logging.Logger) bool {
+func (s *serviceInteractor) isValidAttendeePayment(curTransactions []entities.Transaction, newTran *entities.Transaction, logger logging.Logger) bool {
 	var allDues int64
 	var allPayments int64
 
@@ -394,6 +400,8 @@ func (s *serviceInteractor) isValidPayment(curTransactions []entities.Transactio
 	// -> current_dues
 
 	// can we have negative dues if we owe an attendee money?
+	// - Yes, if the attendee overpaid due to currency conversion or made a mistake when making a bank/SWIFT transfer
+	// - Also yes, if the attendee made a payment, then asked an admin to remove sponsor status
 	if allDues <= 0 {
 		logger.Info("No outstanding dues for attendee %d", newTran.DebitorID)
 		return false

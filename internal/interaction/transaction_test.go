@@ -772,7 +772,7 @@ func TestUpdateTransaction(t *testing.T) {
 				ctx: adminCtx(),
 			},
 			expected: expected{
-				err: apierrors.NewForbidden("unable to flag transaction as deleted after 3 days"),
+				err: apierrors.NewForbidden("unable to flag transaction as deleted after 3 days, please book a compensating transaction instead"),
 			},
 		},
 		{
