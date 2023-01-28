@@ -120,7 +120,7 @@ func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[Initi
 func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, error) {
 	var req GetTransactionsRequest
 
-	// debID is required (no, accounting will want to list all debitors for a certain period)
+	// debID is not required, because accounting will want to list transactions for all debitors for a certain period
 	debIDStr := r.URL.Query().Get("debitor_id")
 	var debID int
 	var err error
