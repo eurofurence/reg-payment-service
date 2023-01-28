@@ -551,6 +551,9 @@ func TestCreateTransactionRequestHandler(t *testing.T) {
 		req *CreateTransactionRequest
 	}
 
+	txWithoutEffectiveDate := ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime))
+	txWithoutEffectiveDate.EffectiveDate = ""
+
 	tests := []struct {
 		name     string
 		input    Transaction
@@ -614,6 +617,20 @@ func TestCreateTransactionRequestHandler(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "Should set effective date to today if left unset",
+			input: txWithoutEffectiveDate,
+			expected: expected{
+				err: nil,
+				req: &CreateTransactionRequest{
+					Transaction: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+				},
+			},
+		},
+	}
+
+	nowFunc = func() time.Time {
+		return testTime
 	}
 
 	for _, tt := range tests {

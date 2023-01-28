@@ -166,6 +166,8 @@ func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsRes
 	return json.NewEncoder(w).Encode(res)
 }
 
+var nowFunc = time.Now // needed for tests
+
 func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
 	var request CreateTransactionRequest
 	if err := json.NewDecoder(r.Body).Decode(&request.Transaction); err != nil {
@@ -174,7 +176,7 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 
 	if request.Transaction.EffectiveDate == "" {
 		// default to today
-		request.Transaction.EffectiveDate = time.Now().Format(isoDateFormat)
+		request.Transaction.EffectiveDate = nowFunc().Format(isoDateFormat)
 	}
 
 	if err := validateTransaction(&request.Transaction); err != nil {
