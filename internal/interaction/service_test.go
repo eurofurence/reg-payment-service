@@ -66,7 +66,7 @@ func TestNewServiceInteractor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i, err := NewServiceInteractor(tt.args.repo, tt.args.attClient, tt.args.ccClient)
+			i, err := NewServiceInteractor(tt.args.repo, tt.args.attClient, tt.args.ccClient, &securityConfig)
 			if tt.expected.err != nil {
 				require.EqualError(t, err, tt.expected.err.Error())
 				require.Nil(t, i)

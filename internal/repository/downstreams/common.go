@@ -3,6 +3,7 @@ package downstreams
 import (
 	"context"
 	"errors"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 	"net/http"
 	"time"
 
@@ -39,13 +40,48 @@ func ApiTokenRequestManipulator(fixedApiToken string) aurestclientapi.RequestMan
 	}
 }
 
-func JwtForwardingRequestManipulator() aurestclientapi.RequestManipulatorCallback {
+func AccessTokenForwardingRequestManipulator() aurestclientapi.RequestManipulatorCallback {
 	return func(ctx context.Context, r *http.Request) {
-		jwt, ok := ctx.Value(common.CtxKeyToken{}).(string)
+		accessToken, ok := ctx.Value(common.CtxKeyAccessToken{}).(string)
 		if ok {
-			r.Header.Add(headers.Authorization, "Bearer "+jwt)
+			r.Header.Add(headers.Authorization, "Bearer "+accessToken)
 		}
 		r.Header.Add(middleware.RequestIDHeader, requestIDFromContext(ctx))
+	}
+}
+
+func CookiesOrAuthHeaderForwardingRequestManipulator(conf *config.SecurityConfig) aurestclientapi.RequestManipulatorCallback {
+	return func(ctx context.Context, r *http.Request) {
+		r.Header.Add(middleware.RequestIDHeader, requestIDFromContext(ctx))
+
+		idToken, ok2 := ctx.Value(common.CtxKeyIdToken{}).(string)
+		accessToken, ok3 := ctx.Value(common.CtxKeyAccessToken{}).(string)
+
+		if ok2 && ok3 {
+			r.AddCookie(&http.Cookie{
+				Name:     conf.Oidc.IdTokenCookieName,
+				Value:    idToken,
+				Domain:   "localhost",
+				Expires:  time.Now().Add(10 * time.Minute),
+				Path:     "/",
+				Secure:   true,
+				HttpOnly: true,
+				SameSite: http.SameSiteStrictMode,
+			})
+			r.AddCookie(&http.Cookie{
+				Name:     conf.Oidc.AccessTokenCookieName,
+				Value:    accessToken,
+				Domain:   "localhost",
+				Expires:  time.Now().Add(10 * time.Minute),
+				Path:     "/",
+				Secure:   true,
+				HttpOnly: true,
+				SameSite: http.SameSiteStrictMode,
+			})
+		} else {
+			// downstream service may need to contact idp to get identity info, but better than nothing
+			r.Header.Add(headers.Authorization, "Bearer "+accessToken)
+		}
 	}
 }
 

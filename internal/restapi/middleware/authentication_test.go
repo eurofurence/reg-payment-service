@@ -68,7 +68,7 @@ func TestParseAuthCookie(t *testing.T) {
 				Name:  "test-cookie",
 				Value: "cookie-value",
 			},
-			expected: "Bearer cookie-value",
+			expected: "cookie-value",
 		},
 		{
 			name:      "Should return empty string when cookie name doesn't match",
@@ -103,86 +103,6 @@ func TestParseAuthCookie(t *testing.T) {
 		})
 	}
 
-}
-
-func TestParseBearerToken(t *testing.T) {
-
-	strPtr := func(s string) *string {
-		return &s
-	}
-
-	tests := []struct {
-		name                 string
-		inputTokenCookieName string
-		inputAuthHeaderValue *string
-		inputCookie          *http.Cookie
-		expected             string
-	}{
-		{
-			name:                 "Header present, should get value from auth header",
-			inputAuthHeaderValue: strPtr("Bearer header-value"),
-			inputTokenCookieName: "doesn't matter",
-			inputCookie:          nil,
-			expected:             "Bearer header-value",
-		},
-		{
-			name:                 "Header not present, should get cookie value",
-			inputAuthHeaderValue: nil,
-			inputTokenCookieName: "test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		{
-			name:                 "Make sure TokenCookieName from config is honored",
-			inputAuthHeaderValue: nil,
-			inputTokenCookieName: "another-test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "another-test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		{
-			name:                 "Existing but empty header leads to the cookie being used",
-			inputAuthHeaderValue: strPtr(""),
-			inputTokenCookieName: "another-test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "another-test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		// two more test cases are already covered via TestParseAuthCookie
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			r, err := http.NewRequest("GET", "/", nil)
-			require.NoError(t, err)
-
-			if tt.inputAuthHeaderValue != nil {
-				r.Header.Add(headers.Authorization, *tt.inputAuthHeaderValue)
-			}
-			if tt.inputCookie != nil {
-				r.AddCookie(tt.inputCookie)
-			}
-
-			// We only need to fill a single field, the others are not used.
-			securityConf := &config.SecurityConfig{
-				Oidc: config.OpenIdConnectConfig{
-					TokenCookieName: tt.inputTokenCookieName,
-				},
-			}
-
-			value := parseBearerToken(r, securityConf)
-
-			require.Equal(t, tt.expected, value)
-		})
-	}
 }
 
 func TestKeyFuncForKey(t *testing.T) {
@@ -370,10 +290,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "John Doe",
-							Roles: []string{"admin"},
-						},
+						Name:   "John Doe",
+						Groups: []string{"admin"},
 					},
 				},
 				shouldFail: false,
@@ -396,10 +314,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "",
-							Roles: nil,
-						},
+						Name:   "",
+						Groups: nil,
 					},
 				},
 				shouldFail: false,
@@ -448,10 +364,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "John Doe",
-							Roles: []string{"admin", "staff", "goh", "press"},
-						},
+						Name:   "John Doe",
+						Groups: []string{"admin", "staff", "goh", "press"},
 					},
 				},
 				shouldFail: false,
@@ -498,7 +412,7 @@ func TestCheckRequestAuthorization(t *testing.T) {
 				}
 
 				if tt.expected.jwt != "" {
-					value, ok := r.Context().Value(common.CtxKeyToken{}).(string)
+					value, ok := r.Context().Value(common.CtxKeyIdToken{}).(string)
 					if !ok {
 						require.FailNow(t, "expected type string")
 					}

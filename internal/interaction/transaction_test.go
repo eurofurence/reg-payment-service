@@ -244,7 +244,7 @@ func TestGetTransactionsForDebitor(t *testing.T) {
 				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
 			}
 
-			i, err := NewServiceInteractor(db, asm, &CncrdAdapterMock{})
+			i, err := NewServiceInteractor(db, asm, &CncrdAdapterMock{}, &securityConfig)
 			require.NoError(t, err)
 
 			rt, err := i.GetTransactionsForDebitor(tt.args.ctx, tt.args.query)
@@ -687,7 +687,7 @@ func TestCreateTransaction(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm)
+			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
 			require.NoError(t, err)
 
 			res, err := i.CreateTransaction(tt.args.ctx, tt.args.transaction)
@@ -886,7 +886,7 @@ func TestUpdateTransaction(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm)
+			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
 			require.NoError(t, err)
 
 			err = i.UpdateTransaction(tt.args.ctx, tt.args.transaction)
@@ -1045,7 +1045,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm)
+			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
 			require.NoError(t, err)
 
 			if tt.args.ctx == nil {
@@ -1099,9 +1099,7 @@ func adminCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{"admin"},
-			},
+			Groups: []string{"admin"},
 		},
 	})
 }
@@ -1112,9 +1110,7 @@ func attendeeCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{""},
-			},
+			Groups: []string{""},
 		},
 	})
 }
@@ -1122,7 +1118,7 @@ func attendeeCtx() context.Context {
 func contextWithClaims(claims *common.AllClaims) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.CtxKeyClaims{}, claims)
-	ctx = context.WithValue(ctx, common.CtxKeyToken{}, "token12345")
+	ctx = context.WithValue(ctx, common.CtxKeyIdToken{}, "token12345")
 
 	return ctx
 }

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +30,12 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
 
+var securityConfig = config.SecurityConfig{
+	Oidc: config.OpenIdConnectConfig{
+		AdminGroup: "admin",
+	},
+}
+
 func apiKeyCtx() context.Context {
 	return context.WithValue(context.Background(), common.CtxKeyAPIKey{}, "123456")
 }
@@ -39,9 +46,7 @@ func adminCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{"admin"},
-			},
+			Groups: []string{"admin"},
 		},
 	})
 }
@@ -52,9 +57,7 @@ func attendeeCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{""},
-			},
+			Groups: []string{""},
 		},
 	})
 }
@@ -62,7 +65,7 @@ func attendeeCtx() context.Context {
 func contextWithClaims(claims *common.AllClaims) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.CtxKeyClaims{}, claims)
-	ctx = context.WithValue(ctx, common.CtxKeyToken{}, "token12345")
+	ctx = context.WithValue(ctx, common.CtxKeyIdToken{}, "token12345")
 
 	return ctx
 }
@@ -103,7 +106,7 @@ func setupServer(t *testing.T, att *AttendeeServiceMock, cncrd *CncrdAdapterMock
 	router.Route("/api/rest/v1", func(r chi.Router) {
 		// TODO create mock of Interactor interface
 		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(),
-			att, cncrd)
+			att, cncrd, &securityConfig)
 
 		require.NoError(t, err)
 		Create(r, s)
@@ -331,7 +334,7 @@ func TestHandleTransactions(t *testing.T) {
 
 		logger := logging.NewNoopLogger()
 
-		i, err := interaction.NewServiceInteractor(tt.args.db, tt.args.att, tt.args.cncrd)
+		i, err := interaction.NewServiceInteractor(tt.args.db, tt.args.att, tt.args.cncrd, &securityConfig)
 		require.NoError(t, err)
 
 		fn := MakeGetTransactionsEndpoint(i)

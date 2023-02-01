@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"flag"
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/authservice"
 	"net/http"
 	"path/filepath"
 
@@ -71,15 +72,19 @@ func main() {
 	//playDatabase(ctx, repo)
 
 	attClient := constructOrFail(ctx, logger, func() (attendeeservice.AttendeeService, error) {
-		return attendeeservice.New(conf.Service.AttendeeService, conf.Security.Fixed.Api)
+		return attendeeservice.New(conf.Service.AttendeeService, &conf.Security)
 	})
 
 	ccClient := constructOrFail(ctx, logger, func() (cncrdadapter.CncrdAdapter, error) {
 		return cncrdadapter.New(conf.Service.ProviderAdapter, conf.Security.Fixed.Api)
 	})
 
+	_ = constructOrFail(ctx, logger, func() (authservice.AuthService, error) {
+		return authservice.New(&conf.Security)
+	})
+
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo, attClient, ccClient)
+		return interaction.NewServiceInteractor(repo, attClient, ccClient, &conf.Security)
 	})
 
 	logger.Debug("Setting up router")

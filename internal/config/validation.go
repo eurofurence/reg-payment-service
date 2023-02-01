@@ -47,7 +47,7 @@ func validateServerConfiguration(errs url.Values, c ServerConfig) {
 
 func validateSecurityConfiguration(errs url.Values, c SecurityConfig) {
 	checkLength(&errs, 16, 256, "security.fixed_token.api", c.Fixed.Api)
-	checkLength(&errs, 1, 256, "security.oidc.admin_role", c.Oidc.AdminRole)
+	checkLength(&errs, 1, 256, "security.oidc.admin_role", c.Oidc.AdminGroup)
 
 	parsedKeySet = make([]*rsa.PublicKey, 0)
 	for i, keyStr := range c.Oidc.TokenPublicKeysPEM {
