@@ -314,7 +314,6 @@ func TestCreateTransaction(t *testing.T) {
 			args: args{
 				transaction: &entities.Transaction{
 					DebitorID:       1,
-					TransactionID:   "1",
 					TransactionType: entities.TransactionTypeDue,
 					Amount: entities.Amount{
 						ISOCurrency: "EUR",
@@ -333,7 +332,6 @@ func TestCreateTransaction(t *testing.T) {
 			args: args{
 				transaction: &entities.Transaction{
 					DebitorID:       1,
-					TransactionID:   "1",
 					TransactionType: entities.TransactionTypeDue,
 					Amount: entities.Amount{
 						ISOCurrency: "EUR",
@@ -348,11 +346,16 @@ func TestCreateTransaction(t *testing.T) {
 			},
 		},
 		{
-			name: "should fail when pending payments are present",
+			name: "should not fail when pending payments are present",
 			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
 				transaction: &entities.Transaction{
-					DebitorID:       1,
-					TransactionType: entities.TransactionTypePayment,
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionStatus: entities.TransactionStatusTentative,
 					Amount: entities.Amount{
 						ISOCurrency: "EUR",
 						GrossCent:   2000,
@@ -382,7 +385,8 @@ func TestCreateTransaction(t *testing.T) {
 				},
 			},
 			expected: expected{
-				err: apierrors.NewConflict("There are pending payments for attendee 1"),
+				err:           nil,
+				createPayLink: true,
 			},
 		},
 		{
@@ -671,6 +675,45 @@ func TestCreateTransaction(t *testing.T) {
 				createPayLink: true,
 			},
 		},
+		{
+			name: "should fail with incorrect passed transaction ID",
+			args: args{
+				createPaylinkFunc: func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error) {
+					return cncrdadapter.PaymentLinkDto{Link: "pay.url.go/1"}, nil
+				},
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) {
+					return []int64{1, 2, 3}, nil
+				},
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodCredit,
+					TransactionID:     "123456",
+					TransactionStatus: entities.TransactionStatusTentative,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: attendeeCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           apierrors.NewBadRequest("Invalid format for `TransactionID`"),
+				createPayLink: false,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -953,7 +996,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 				},
 			},
 			expected: expected{
-				err: apierrors.NewNotFound("no outstanding dues for debitor"),
+				err: apierrors.NewBadRequest("no outstanding dues for debitor"),
 			},
 		},
 		{
@@ -1467,6 +1510,79 @@ func TestRandomDigits(t *testing.T) {
 			if tt.expectedStringLen > 0 {
 				require.Regexp(t, regexp.MustCompile("[0-9]+"), res)
 			}
+		})
+	}
+}
+
+func TestValidateTransactionID(t *testing.T) {
+	tests := []struct {
+		name     string
+		prefix   string
+		inputID  string
+		expected bool
+	}{
+		{
+			name:     "should succeed with valid transaction ID",
+			prefix:   "abc123",
+			inputID:  "abc123-000302-0101-163055-1234",
+			expected: true,
+		},
+		{
+			name:     "should fail with invalid segments",
+			prefix:   "abc123",
+			inputID:  "abc1234-000302-0101-163055",
+			expected: false,
+		},
+		{
+			name:     "should fail with invalid prefix",
+			prefix:   "abc123",
+			inputID:  "abc1234-000302-0101-163055-1234",
+			expected: false,
+		},
+		{
+			name:     "should fail with letters in second segment",
+			prefix:   "abc123",
+			inputID:  "abc123-000ab302-0101-163055-1234",
+			expected: false,
+		},
+		{
+			name:     "should fail with less than six digits in second segemnt",
+			prefix:   "abc123",
+			inputID:  "abc123-00023-0101-163055-1234",
+			expected: false,
+		},
+		{
+			name:     "should fail with invalid time format",
+			prefix:   "abc123",
+			inputID:  "abc123-000302-0101-166100-1234", // 01.01T16:61:00 <- Minute 61 should fail
+			expected: false,
+		},
+		{
+			name:     "should fail with letters in last segment",
+			prefix:   "abc123",
+			inputID:  "abc123-000302-0101-163055-1234a", // 01.01T16:61:00 <- Minute 61 should fail
+			expected: false,
+		},
+		{
+			name:     "should fail with less than 4 numbers in last segment",
+			prefix:   "abc123",
+			inputID:  "abc123-000302-0101-163055-123", // 01.01T16:61:00 <- Minute 61 should fail
+			expected: false,
+		},
+		{
+			name:     "should fail with more than 4 numbers in last segment",
+			prefix:   "abc123",
+			inputID:  "abc123-000302-0101-163055-12345", // 01.01T16:61:00 <- Minute 61 should fail
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt := tt
+			t.Parallel()
+
+			require.Equal(t, tt.expected, validateTransactionID(tt.prefix, tt.inputID))
 		})
 	}
 }

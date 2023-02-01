@@ -19,10 +19,11 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
+// nolint
 const apiKeyHeader = "X-Api-Key"
 
 var (
-	DownstreamError = errors.New("downstream unavailable - see log for details")
+	ErrDownStreamUnavailable = errors.New("downstream unavailable - see log for details")
 )
 
 func requestIDFromContext(ctx context.Context) string {
@@ -109,7 +110,7 @@ func ErrByStatus(err error, status int) error {
 		return err
 	}
 	if status >= 300 {
-		return DownstreamError
+		return ErrDownStreamUnavailable
 	}
 	return nil
 }
