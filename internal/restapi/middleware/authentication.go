@@ -16,6 +16,7 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
+// nolint
 const apiKeyHeader = "X-Api-Key"
 const bearerPrefix = "Bearer"
 

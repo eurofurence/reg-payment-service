@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"errors"
 	"flag"
 	"net/http"
@@ -12,7 +11,6 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 
 	"github.com/eurofurence/reg-payment-service/internal/config"
-	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/interaction"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
@@ -165,58 +163,4 @@ func constructOrFail[T any](ctx context.Context, logger logging.Logger, construc
 
 	return t
 
-}
-
-func playDatabase(ctx context.Context, r database.Repository) {
-	logger := logging.NewLogger()
-	// TODO use test function to test again mysql db.
-	err := testCreateTransaction(ctx, r)
-	if err != nil {
-		if !errors.Is(err, mysql.ErrTransactionExists) {
-			logger.Fatal("An error occurred. [error]: %v", err)
-		}
-
-		dt := defaultTransaction()
-
-		dt.Comment = "Hello1"
-		dt.TransactionStatus = entities.TransactionStatusValid
-		dt.DebitorID = 1
-		err = testUpdateTransaction(ctx, r, dt)
-		if err != nil {
-			logger.Fatal("An error occurred. [error]: %v", err)
-		}
-
-	}
-
-}
-
-func testCreateTransaction(ctx context.Context, r database.Repository) error {
-	return r.CreateTransaction(ctx, defaultTransaction())
-}
-
-func testUpdateTransaction(ctx context.Context, r database.Repository, tr entities.Transaction) error {
-	return r.UpdateTransaction(ctx, tr, false)
-}
-
-func defaultTransaction() entities.Transaction {
-	ti, _ := time.Parse("2006-01-02", "2022-12-30")
-
-	return entities.Transaction{
-		TransactionID:     "234567895",
-		DebitorID:         2,
-		TransactionType:   entities.TransactionTypeDue,
-		PaymentMethod:     entities.PaymentMethodCredit,
-		TransactionStatus: entities.TransactionStatusPending,
-		Amount: entities.Amount{
-			ISOCurrency: "EUR",
-			GrossCent:   19000,
-			VatRate:     19.0,
-		},
-		Comment: "Payment Noroth",
-		EffectiveDate: sql.NullTime{
-			Valid: true,
-			Time:  ti,
-		},
-		DueDate: sql.NullTime{},
-	}
 }
