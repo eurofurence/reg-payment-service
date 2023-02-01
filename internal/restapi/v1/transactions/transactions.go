@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-http-utils/headers"
@@ -118,7 +120,7 @@ func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[Initi
 func getTransactionsRequestHandler(r *http.Request) (*GetTransactionsRequest, error) {
 	var req GetTransactionsRequest
 
-	// debID is required (no, accounting will want to list all debitors for a certain period)
+	// debID is not required, because accounting will want to list transactions for all debitors for a certain period
 	debIDStr := r.URL.Query().Get("debitor_id")
 	var debID int
 	var err error
@@ -164,12 +166,17 @@ func getTransactionsResponseHandler(ctx context.Context, res *GetTransactionsRes
 	return json.NewEncoder(w).Encode(res)
 }
 
+var nowFunc = time.Now // needed for tests
+
 func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest, error) {
 	var request CreateTransactionRequest
-	err := json.NewDecoder(r.Body).Decode(&request.Transaction)
-
-	if err != nil {
+	if err := json.NewDecoder(r.Body).Decode(&request.Transaction); err != nil {
 		return nil, err
+	}
+
+	if request.Transaction.EffectiveDate == "" {
+		// default to today
+		request.Transaction.EffectiveDate = nowFunc().Format(isoDateFormat)
 	}
 
 	if err := validateTransaction(&request.Transaction); err != nil {
@@ -192,25 +199,26 @@ func createTransactionResponseHandler(ctx context.Context, res *CreateTransactio
 func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest, error) {
 	transactionID := chi.URLParam(r, "id")
 	if transactionID == "" {
-		return nil, errors.New("expected transaction id in url paramter, but received empty value")
+		return nil, errors.New("expected transaction id in url parameter, but received empty value")
 	}
 
-	var tran Transaction
-	if err := json.NewDecoder(r.Body).Decode(&tran); err != nil {
+	var request UpdateTransactionRequest
+	if err := json.NewDecoder(r.Body).Decode(&request.Transaction); err != nil {
 		return nil, err
 	}
 
-	if tran.DebitorID <= 0 {
-		return nil, errors.New("no debitor was provided in the request")
+	if request.Transaction.TransactionIdentifier == "" {
+		request.Transaction.TransactionIdentifier = transactionID
+	}
+	if request.Transaction.TransactionIdentifier != transactionID {
+		return nil, errors.New("transaction id in payload must match URL parameter")
 	}
 
-	tran.TransactionIdentifier = transactionID
-
-	if anyNotEmpty(tran.PaymentStartUrl, string(tran.Method), string(tran.TransactionType), tran.Comment) {
-		return nil, errors.New("updates on transactions may only change the status, payment processor information and due date")
+	if err := validateTransaction(&request.Transaction); err != nil {
+		return nil, err
 	}
 
-	return &UpdateTransactionRequest{Transaction: tran}, nil
+	return &request, nil
 }
 
 func updateTransactionResponseHandler(ctx context.Context, _ *UpdateTransactionResponse, w http.ResponseWriter) error {
@@ -249,26 +257,29 @@ func validateTransaction(t *Transaction) error {
 	}
 
 	if !t.TransactionType.IsValid() {
-		return fmt.Errorf("invalid transaction type - TransactionType: %s", string(t.TransactionType))
+		return fmt.Errorf("invalid transaction type - TransactionType: %s", url.QueryEscape(string(t.TransactionType)))
 	}
 
 	if !t.Method.IsValid() {
-		return fmt.Errorf("invalid payment method - Method: %s", string(t.Method))
+		return fmt.Errorf("invalid payment method - Method: %s", url.QueryEscape(string(t.Method)))
 	}
 
 	if !t.Status.IsValid() || t.Status == entities.TransactionStatusDeleted {
-		return fmt.Errorf("invalid transaction status - Status: %s", string(t.Status))
+		return fmt.Errorf("invalid transaction status - Status: %s", url.QueryEscape(string(t.Status)))
+	}
+
+	_, err := parseEffectiveDate(t.EffectiveDate)
+	if t.EffectiveDate == "" || err != nil {
+		return fmt.Errorf("invalid effective date - EffectiveDate: %s", url.QueryEscape(t.EffectiveDate))
+	}
+
+	if t.Amount.Currency == "" {
+		return errors.New("empty currency is not allowed")
+	}
+
+	if t.Amount.GrossCent == 0 {
+		return errors.New("GrossCent cannot be 0, use delete instead")
 	}
 
 	return nil
-}
-
-func anyNotEmpty(values ...string) bool {
-	for _, v := range values {
-		if v != "" {
-			return true
-		}
-	}
-
-	return false
 }

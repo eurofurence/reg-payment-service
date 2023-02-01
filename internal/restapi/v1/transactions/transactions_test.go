@@ -551,6 +551,9 @@ func TestCreateTransactionRequestHandler(t *testing.T) {
 		req *CreateTransactionRequest
 	}
 
+	txWithoutEffectiveDate := ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime))
+	txWithoutEffectiveDate.EffectiveDate = ""
+
 	tests := []struct {
 		name     string
 		input    Transaction
@@ -614,6 +617,20 @@ func TestCreateTransactionRequestHandler(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "Should set effective date to today if left unset",
+			input: txWithoutEffectiveDate,
+			expected: expected{
+				err: nil,
+				req: &CreateTransactionRequest{
+					Transaction: ToV1Transaction(newTransaction(1, "1230", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
+				},
+			},
+		},
+	}
+
+	nowFunc = func() time.Time {
+		return testTime
 	}
 
 	for _, tt := range tests {
@@ -718,7 +735,7 @@ func TestUpdateTransactionRequestHandler(t *testing.T) {
 				transaction:   ToV1Transaction(newTransaction(1, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
 			},
 			expected: expected{
-				err: errors.New("expected transaction id in url paramter, but received empty value"),
+				err: errors.New("expected transaction id in url parameter, but received empty value"),
 				req: nil,
 			},
 		},
@@ -729,7 +746,7 @@ func TestUpdateTransactionRequestHandler(t *testing.T) {
 				transaction:   ToV1Transaction(newTransaction(0, "1234", entities.TransactionTypeDue, entities.PaymentMethodCredit, entities.TransactionStatusPending, testTime)),
 			},
 			expected: expected{
-				err: errors.New("no debitor was provided in the request"),
+				err: errors.New("invalid debitor id supplied - DebitorID: 0"),
 				req: nil,
 			},
 		},
@@ -740,7 +757,7 @@ func TestUpdateTransactionRequestHandler(t *testing.T) {
 				transaction:   Transaction{DebitorID: 10, Status: entities.TransactionStatusPending, PaymentStartUrl: "12398"},
 			},
 			expected: expected{
-				err: errors.New("updates on transactions may only change the status, payment processor information and due date"),
+				err: errors.New("invalid transaction type - TransactionType: "),
 				req: nil,
 			},
 		},
@@ -748,15 +765,36 @@ func TestUpdateTransactionRequestHandler(t *testing.T) {
 			name: "should return update transaction request when everything is successful",
 			args: args{
 				transactionID: "1234",
-				transaction:   Transaction{DebitorID: 10, Status: entities.TransactionStatusPending},
+				transaction: Transaction{
+					DebitorID:       10,
+					TransactionType: entities.TransactionTypePayment,
+					Method:          entities.PaymentMethodCredit,
+					Amount: Amount{
+						Currency:  "EUR",
+						GrossCent: 14000,
+						VatRate:   19.0,
+					},
+					Comment:       "some comment",
+					Status:        entities.TransactionStatusPending,
+					EffectiveDate: "2020-10-31",
+				},
 			},
 			expected: expected{
 				err: nil,
 				req: &UpdateTransactionRequest{
 					Transaction: Transaction{
-						DebitorID:             10,
 						TransactionIdentifier: "1234",
-						Status:                entities.TransactionStatusPending,
+						DebitorID:             10,
+						TransactionType:       entities.TransactionTypePayment,
+						Method:                entities.PaymentMethodCredit,
+						Amount: Amount{
+							Currency:  "EUR",
+							GrossCent: 14000,
+							VatRate:   19.0,
+						},
+						Comment:       "some comment",
+						Status:        entities.TransactionStatusPending,
+						EffectiveDate: "2020-10-31",
 					},
 				},
 			},
