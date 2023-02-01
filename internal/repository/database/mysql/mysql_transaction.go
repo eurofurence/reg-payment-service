@@ -10,7 +10,15 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-var allowedFields = []string{"PaymentStartUrl", "TransactionStatus", "DueDate", ""}
+var allowedFields = []string{
+	"Amount",
+	"TransactionStatus",
+	"Comment",
+	// TODO Missing payment processor information,
+	"PaymentStartUrl",
+	"EffectiveDate",
+	"DueDate",
+}
 
 var (
 	// ErrTransactionExists is returned when a transaction already exists in the database

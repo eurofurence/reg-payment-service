@@ -15,8 +15,9 @@ import (
 	"strings"
 )
 
+// nolint
 const apiKeyHeader = "X-Api-Key"
-const bearerPrefix = "Bearer"
+const bearerPrefix = "Bearer "
 
 // --- getting the values from the request ---
 
@@ -38,11 +39,11 @@ func parseAuthCookie(r *http.Request, cookieName string) string {
 func fromAuthHeader(r *http.Request) string {
 	headerValue := r.Header.Get(headers.Authorization)
 
-	if !strings.HasPrefix(headerValue, "Bearer ") {
+	if !strings.HasPrefix(headerValue, bearerPrefix) {
 		return ""
 	}
 
-	return strings.TrimPrefix(headerValue, "Bearer ")
+	return strings.TrimPrefix(headerValue, bearerPrefix)
 }
 
 func fromApiTokenHeader(r *http.Request) string {
