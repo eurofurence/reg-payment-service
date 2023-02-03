@@ -26,9 +26,8 @@ security:
   fixed_token:
     api: 'some-api-token-must-be-long-enough'
   oidc:
-    token_cookie_name: 'JWT'
-    user_info_url: 'http://localhost/userinfo'
-    admin_role: 'admin'
+    id_token_cookie_name: 'JWT'
+    admin_group: 'admin'
   cors:
     disable: true
     allow_origin: 'http://localhost:8000,http://localhost:8001'
@@ -59,9 +58,8 @@ logging:
 	require.Equal(t, 120, conf.Server.IdleTimeout)
 	require.Equal(t, Inmemory, conf.Database.Use)
 	require.Equal(t, "some-api-token-must-be-long-enough", conf.Security.Fixed.Api)
-	require.Equal(t, "JWT", conf.Security.Oidc.TokenCookieName)
-	require.Equal(t, "http://localhost/userinfo", conf.Security.Oidc.UserInfoURL)
-	require.Equal(t, "admin", conf.Security.Oidc.AdminRole)
+	require.Equal(t, "JWT", conf.Security.Oidc.IdTokenCookieName)
+	require.Equal(t, "admin", conf.Security.Oidc.AdminGroup)
 	require.True(t, conf.Security.Cors.DisableCors)
 	require.Equal(t, "http://localhost:8000,http://localhost:8001", conf.Security.Cors.AllowOrigin)
 	require.Equal(t, "manually initiated credit card payment", conf.Service.DefaultPaymentComment)
@@ -126,7 +124,7 @@ security:
   fixed_token:
     api: 'too-short'
   oidc:
-    token_cookie_name: 'JWT'
+    id_token_cookie_name: 'JWT'
     token_public_keys_PEM:
       - |
         -----BEGIN PUBLIC KEY-----

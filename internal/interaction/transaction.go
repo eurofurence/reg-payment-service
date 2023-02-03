@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
+	"regexp"
 	"strings"
 	"time"
 
@@ -17,9 +18,21 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 )
 
+const (
+	transactionIDTimeFormat = "0102-150405" // MMDD-HHmmss
+)
+
+var (
+	debRegex       = regexp.MustCompile(`^\d{6,}$`)
+	randDigitRegex = regexp.MustCompile(`^\d{4}$`)
+)
+
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	logger := logging.LoggerFromContext(ctx)
-	mgr := NewIdentityManager(ctx)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	if mgr.IsRegisteredUser() {
 		regIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
@@ -64,16 +77,24 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		}
 
 		tran.TransactionID = id
+	} else {
+		// if a transaction ID is provided, it should be validated against the allowed format (starts with configured prefix, and has the correct number of segments etc.)
+		// (because we allow create with transaction ID set)
+		if !validateTransactionID(appConfig.Service.TransactionIDPrefix, tran.TransactionID) {
+			return nil, apierrors.NewBadRequest("Invalid format for `TransactionID`")
+		}
 	}
-	// TODO #48: if a transaction ID is provided, it should be validated against the allowed format (starts with configured prefix, and has the correct number of segments etc.)
-	// (because we allow create with transaction ID set)
 
 	// default for effective date
 	if !tran.EffectiveDate.Valid {
 		tran.EffectiveDate = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 
-	mgr := NewIdentityManager(ctx)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
 		return s.createTransactionWithElevatedAccess(ctx, tran, mgr)
 	}
@@ -136,8 +157,7 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 	}
 
 	if dues <= 0 {
-		// TODO #48: according to openapi spec, this should be 400
-		return nil, apierrors.NewNotFound("no outstanding dues for debitor")
+		return nil, apierrors.NewBadRequest("no outstanding dues for debitor")
 	}
 
 	defaultCommentFunc := func() string {
@@ -163,7 +183,11 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 }
 
 func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
-	mgr := NewIdentityManager(ctx)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return err
+	}
+
 	logger := logging.LoggerFromContext(ctx)
 
 	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {
@@ -267,20 +291,13 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 	}
 
 	if tran.TransactionType == entities.TransactionTypePayment {
-		// TODO #48 for admin/API user, this check needs to be removed completely
+		// for admin/API user, we do not check if pending payments are present
 		// if we get a money or credit card transfer, we need to be able to book it or accounting will be incorrect
 		// the money is in our bank, so we must book it, no matter if it makes any sense that we got the payment
-		pending, err := s.arePendingPaymentsPresent(ctx, tran.DebitorID)
-		if err != nil {
-			return nil, err
-		}
-		if pending {
-			return nil, apierrors.NewConflict(fmt.Sprintf("There are pending payments for attendee %d", tran.DebitorID))
-		}
 
 		// We first make sure that we successfully persisted the transaction
 		// in the DB before requesting a payment link if applicable
-		err = s.store.CreateTransaction(ctx, *tran)
+		err := s.store.CreateTransaction(ctx, *tran)
 		if err != nil {
 			return nil, err
 		}
@@ -372,9 +389,44 @@ func containsDebitor(debIDs []int64, debID int64) bool {
 	return false
 }
 
+func validateTransactionID(prefix, transactionID string) bool {
+	if transactionID == "" {
+		return false
+	}
+
+	segments := strings.Split(transactionID, "-")
+
+	// we expect 5 segments (Time also contains a dash `-`)
+	if len(segments) != 5 {
+		return false
+	}
+
+	// The first segment contains the configured prefix
+	if segments[0] != prefix {
+		return false
+	}
+
+	// we expect at least 6 digits with leading zeros.
+	if !debRegex.MatchString(segments[1]) {
+		return false
+	}
+
+	// third and fourth segment needs to match the predefined time format.
+	if _, err := time.Parse(transactionIDTimeFormat, fmt.Sprintf("%s-%s", segments[2], segments[3])); err != nil {
+		return false
+	}
+
+	// last segment contains exactly 4 random digits
+	if !randDigitRegex.MatchString(segments[4]) {
+		return false
+	}
+
+	return true
+}
+
 func generateTransactionID(prefix string, tran *entities.Transaction) (string, error) {
 
-	parsedTime := time.Now().UTC().Format("0102-150405")
+	parsedTime := time.Now().UTC().Format(transactionIDTimeFormat)
 	return fmt.Sprintf("%s-%06d-%s-%s", prefix, tran.DebitorID, parsedTime, randomDigits(4)), nil
 
 }

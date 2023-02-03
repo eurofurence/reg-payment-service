@@ -6,15 +6,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/StephanHCB/go-autumn-logging-zerolog/loggermiddleware"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/go-chi/chi/v5"
@@ -26,8 +27,13 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
-	"github.com/eurofurence/reg-payment-service/internal/restapi/middleware"
 )
+
+const securityConfig = `# minimal needed config used for unit tests
+security:
+  oidc:
+    admin_group: admin
+`
 
 func apiKeyCtx() context.Context {
 	return context.WithValue(context.Background(), common.CtxKeyAPIKey{}, "123456")
@@ -39,9 +45,7 @@ func adminCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{"admin"},
-			},
+			Groups: []string{"admin"},
 		},
 	})
 }
@@ -52,9 +56,7 @@ func attendeeCtx() context.Context {
 			Subject: "1234567890",
 		},
 		CustomClaims: common.CustomClaims{
-			Global: common.GlobalClaims{
-				Roles: []string{""},
-			},
+			Groups: []string{""},
 		},
 	})
 }
@@ -62,7 +64,7 @@ func attendeeCtx() context.Context {
 func contextWithClaims(claims *common.AllClaims) context.Context {
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, common.CtxKeyClaims{}, claims)
-	ctx = context.WithValue(ctx, common.CtxKeyToken{}, "token12345")
+	ctx = context.WithValue(ctx, common.CtxKeyIdToken{}, "token12345")
 
 	return ctx
 }
@@ -93,29 +95,6 @@ func (s *statusCodeResponseWriter) WriteHeader(statusCode int) {
 
 //go:generate moq -pkg v1transactions -stub -out attendeeservice_moq_test.go ../../../repository/downstreams/attendeeservice/ AttendeeService
 //go:generate moq -pkg v1transactions -stub -out cncrdadapter_moq_test.go ../../../repository/downstreams/cncrdadapter/ CncrdAdapter
-
-func setupServer(t *testing.T, att *AttendeeServiceMock, cncrd *CncrdAdapterMock) (string, func()) {
-	router := chi.NewRouter()
-	router.Use(middleware.RequestIdMiddleware)
-	router.Use(loggermiddleware.AddZerologLoggerToContext)
-	router.Use(middleware.RequestLoggerMiddleware)
-	router.Use(middleware.CorsHeadersMiddleware(nil))
-	router.Route("/api/rest/v1", func(r chi.Router) {
-		// TODO create mock of Interactor interface
-		s, err := interaction.NewServiceInteractor(inmemory.NewInMemoryProvider(),
-			att, cncrd)
-
-		require.NoError(t, err)
-		Create(r, s)
-	})
-
-	srv := httptest.NewServer(router)
-
-	closeFunc := func() { srv.Close() }
-
-	return srv.URL, closeFunc
-
-}
 
 func newTransaction(debID int64, tranID string,
 	pType entities.TransactionType,
@@ -174,6 +153,8 @@ func fillDefaultDBValues(t *testing.T, db database.Repository) {
 }
 
 func TestHandleTransactions(t *testing.T) {
+	_, err := config.UnmarshalFromYamlConfiguration(strings.NewReader(securityConfig))
+	require.Nil(t, err)
 
 	type args struct {
 		att       *AttendeeServiceMock

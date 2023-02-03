@@ -12,6 +12,8 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 )
 
+// note: there is a TestMain that loads configuration
+
 func TestNewServiceInteractor(t *testing.T) {
 	type args struct {
 		repo      database.Repository

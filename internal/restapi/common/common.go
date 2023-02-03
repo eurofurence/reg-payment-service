@@ -11,20 +11,17 @@ import (
 )
 
 type (
-	CtxKeyRequestID struct{}
-	CtxKeyToken     struct{}
-	CtxKeyAPIKey    struct{}
-	CtxKeyClaims    struct{}
+	CtxKeyIdToken     struct{}
+	CtxKeyAccessToken struct{}
+	CtxKeyAPIKey      struct{}
+	CtxKeyClaims      struct{}
 )
 
-type GlobalClaims struct {
-	Name  string   `json:"name"`
-	EMail string   `json:"email"`
-	Roles []string `json:"roles"`
-}
-
 type CustomClaims struct {
-	Global GlobalClaims `json:"global"`
+	EMail         string   `json:"email"`
+	EMailVerified bool     `json:"email_verified"`
+	Groups        []string `json:"groups,omitempty"`
+	Name          string   `json:"name"`
 }
 
 type AllClaims struct {

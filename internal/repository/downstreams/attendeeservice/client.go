@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 	"net/http"
 
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
@@ -17,13 +18,17 @@ type Impl struct {
 	baseUrl                   string
 }
 
-func New(attendeeServiceBaseUrl string, fixedApiToken string) (AttendeeService, error) {
+func New(attendeeServiceBaseUrl string) (AttendeeService, error) {
 	if attendeeServiceBaseUrl == "" {
 		return nil, errors.New("service.attendee_service not configured. This service cannot function without the attendee service, though you can run it in inmemory database mode for development.")
 	}
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	paymentsChangedClient, err := downstreams.ClientWith(
-		downstreams.ApiTokenRequestManipulator(fixedApiToken),
+		downstreams.ApiTokenRequestManipulator(conf.Security.Fixed.Api),
 		"attendee-service-webhook-breaker",
 	)
 	if err != nil {
@@ -31,7 +36,7 @@ func New(attendeeServiceBaseUrl string, fixedApiToken string) (AttendeeService, 
 	}
 
 	listMyRegistrationsClient, err := downstreams.ClientWith(
-		downstreams.JwtForwardingRequestManipulator(),
+		downstreams.CookiesOrAuthHeaderForwardingRequestManipulator(conf.Security),
 		"attendee-service-breaker",
 	)
 	if err != nil {

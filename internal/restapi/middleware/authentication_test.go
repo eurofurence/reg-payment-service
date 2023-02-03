@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"crypto/rsa"
 	"net/http"
 	"testing"
@@ -16,12 +17,6 @@ import (
 )
 
 const valid_JWT_is_not_staff = `eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbXX0sImlhdCI6MTUxNjIzOTAyMn0.ove6_7BWQRe9HQyphwDdbiaAchgn9ynC4-2EYEXFeVTDADC4P3XYv5uLisYg4Mx8BZOnkWX-5L82pFO1mUZM147gLKMsYlc-iMKXy4sKZPzhQ_XKnBR-EBIf5x_ZD1wpva9ti7Yrvd0vDi8YSFdqqf7R4RA11hv9kg-_gg1uea6sK-Q_eEqoet7ocqGVLu-ghhkZdVLxu9tWJFPNueILWv8vW1Y_u9fDtfOhw7Ugf5ysI9RXiO-tXEHKN2HnFPCkwccnMFt4PJRzU1VoOldz0xzzZRb-j2tlbjLqcQkjMwLEoPQpC4Wbl8DgkaVdTi2aNyH7EbWMynlSOZIYK0AFvQ`
-const valid_JWT_is_not_staff_sub101 = `eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMDEiLCJnbG9iYWwiOnsibmFtZSI6Ik5vcm1hbG8gMTAxIiwicm9sZXMiOltdfSwiaWF0IjoxNTE2MjM5MDIyfQ.btbaXOuIP23GpDQH3yRM82h4VoKG6HFLsIs4oh9fNKgb_P6exEOc2jeRSQXkpXjOst-xDGzAy7QtvK_ZN7ckPJAWWo5EhH4ujJxtzIGe-q013ST6q_54S887Cvdyf3EpIE9vV4ZNK0agFApghW4B62vrJuO00jwLS-V6wRSqkN6GAYQPbX3aAVBS7dPZgKxxHSDyOMRG-hHrc6BExMGQr89fMAHR7QkwWx0AeFDYJZ7AkI0XlYNVG1kVlKLbHYCbx6I4XTcHqMsHqlYJ9qVtss3GjVIfF3OPld3Ni5kR--51wFIZs2-47vLxUAGr5EHsblreZIjLYsDJO01ZfwURdw`
-
-const valid_JWT_is_staff = `eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbInN0YWZmIl19LCJpYXQiOjE1MTYyMzkwMjJ9.PNO4vV6V6iRg4-LcvJsRHyTSx7-6lDmqh6GrUWM4_OrhmmUWh2W4KF6sOfUco7sJ_I0PFOrnPGqREYAPuG1oAkHfitq5GdkYHCnJuHXXWo5d982GPs7zI-l9SxAgcUDdytesmSbq9Ktoad94OUL5bR8Uln0DPTlZvXDTAuCmAMW_89a4C-i71bsCYaFgL0RsJQ4yR4f3ez2M4hG4mNBjwaU4Ke77qdQIjx_9pP5ph37X8Z7twsC1yBH-Hev-293Naj3FZS8y63Zb6VGG3w8WW69eN_apoGRo26ZyaiDChAzOI-c1xkbMC5KYbnFQl5Ubdgk8sQgmp20RHHTV1R8Bcg`
-const valid_JWT_is_staff_sub202 = `eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIyMDIiLCJnbG9iYWwiOnsibmFtZSI6IkpvaG4gU3RhZmYiLCJyb2xlcyI6WyJzdGFmZiJdfSwiaWF0IjoxNTE2MjM5MDIyfQ.aZPHUaia1SBvAu06DKDURIpcqmexk7MkHCzYvrdj4l9H3QbXeCBfA3WZvcw1bN5C-aEN3GmJeiaCpK4m1Loi7oJxJgxEL1iUp4zW_tglPd0QNquLpZNNxDLa-99PpWDLw1EYslqYWd74lB2xnlZvrxmTpciDJeBIWRZA1bAISZQLRGDCv4VD_qZrkEHl66dOTp7kjYeQ9hme9ckeFu06MoOj0p8EdM9GPXlGQFlXYiKbwan4guvJNtIOnbERlUfhWKdL3GffAY7_zO1Xu0lipm9bGHbI0OH3-HQDnKBGyhPvRg829LMfZZW7qrwu-UW4hKgS9L4e8ltcGoHL3wlD3w`
-
-const valid_JWT_is_admin = `eyJhbGciOiJSUzUxMiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbImFkbWluIl19LCJpYXQiOjE1MTYyMzkwMjJ9.sriAGCekreVU3nlQHc8Di7BqqI4Tut7tVNMWYa3kEpRi39Em5lOQ0b7w69idZEKT-MJfBGLVicnkw7Q4l8pUpJuHZMnja5YBIp7FDTg-KKbX__oOSSOnLhjaIGNFR_Xk_DanGrolQMKSYIfQs8MSgRO1bq-ZccCp1iJ4sdOOS4PenXj9h6xSe_lidGp8Wk47qwzRAFHYURaHFl_TCPMNDrYbM5MMIv8Lkye_duLxLo3zc9bnwWinhyD00p7ASwKgMc6vtWeTu_h000OOuviKoc2XKzOjUurqtm9Cird5rDAgAYtT_nTI_N4IzWFiRRPqX1IODe2zlqvKucv_FjzE8g`
 
 const pemPublicKeyRS512 = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
@@ -38,9 +33,6 @@ const valid_JWT_is_admin_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI
 const valid_JWT_256_no_claims = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyfQ.ajUvZZVkUQIsqLn_nEj-py1n6HWek7KCuyFlYMEe5D37XHI7Ydujcs4MAGKNVI7vCY_oyQHtL32lxKDinTiT-wgWLxwJtSXCxfu6aOTFnpC4JOGTFGhjzWjOSB4djW2fKthkS0xR_0NEOWMF3RjqMsneiZDKRobZhkH3VLnNgUhAM1Msy6laPvxwUf-qeqH0LZOhRJ21_TstII7xDKpilkwiBCoHFoQTlNECHqCiC8B69fCVlUo6Ri--a5WhV6p_t4SKEtP2bVRXjyIA8e6tG0qsL9ki6UaT4AejK7UvA4dIRwu2dRVFPJGDegcbB0OSVSPbTSJI_-ygi-Z6Cj03fg`
 const valid_JWT_256_multiple_claims = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbImFkbWluIiwic3RhZmYiLCJnb2giLCJwcmVzcyJdfSwiaWF0IjoxNTE2MjM5MDIyfQ.CBNNQZ395IE7BGWD3BlIt2G5abeY8tMkn_8qP5_HeIIoe0nHLdJzxE58iKxh4kkLKbDefgHzu1NlBMUuO5T5o6XxauwwPyt2xcR77A7Wc3y24IuOd-Ri2wraq-6hOcbFWiPjEVtZ5ppOG2FNR_iTgDHYpVSP5MY8uEmvSzLRGSihRu_jfNARgHXpqXtQ5QNa0bKLT_HmIvvLpXIuc9nj312N3zQ6jzJRbLqMvQRr_OJXqq495pc5KsAvbTBmOixBHhm43K9BR4pRJsSccVRfodNqBuUyXKlvR4L8SclygTWQ77bBfeLYJdxmfi6NyHa1-lMWk26vwQ6eZk4FCcKy5A`
 const invalid_JWT_is_admin_no_subject_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJnbG9iYWwiOnsibmFtZSI6IkpvaG4gRG9lIiwicm9sZXMiOlsiYWRtaW4iXX0sImlhdCI6MTUxNjIzOTAyMn0.qNvWt_hp357DUZMCZLXOzWwpC0eeYReipcXQhkIzKkBO6m0xgO3MmOU4GEZFnA69d9Hi-0b0FhnwrenhIKNLjixwQ4zaO5BicptoPw-giQLQkutAcBglmi6v55dGGqS0zikE8w2tgK5HfLPmvNm2ZEj_FPipSyeK9O1JJw2F_cHEBmrRONp69Qdybfk1gsrTwQx7hZSHOv8q0F58dr4tctbySQerdlvInbYPMIgOqQ8PCj5t5bHA4-dwHOSxz8gqG3oTBZ50o8RbLqh7tsatqRVo64wTI86g4evKxRnsBlpcy4BLID6lQ-_2d7w5bFBNw9ZW-4dA-CNc347hKw59cQ`
-
-const valid_JWT_is_non_staff_subject_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiZ2xvYmFsIjp7Im5hbWUiOiJKb2huIERvZSIsInJvbGVzIjpbXX0sImlhdCI6MTUxNjIzOTAyMn0.phzC1-ExNKJyYoh2MD-3N0Kd6gUjPUXuOplf6bvkb2qyhDDcVJFQtx9lcLLz03KhYBZf2LFp8tLu0Ezu9KacJXNSKmN2Vl_EMbbsxmDCe0JnDZ-UZQXlE6Z43dQPmKVXSKzYMSNPPEN0UsSxS_DYzHkYG2kUwjeI51y_zQ5Yis6M5XO4erh6ji6Lf_XYZseR-MG6PxkO4AdtOSijSj_12z_17QiuYImqljrAp2pmvALhyQzgCIRRyCeBY_T2NQVr7SkTR8ljAB9nv0b1DlZHE-N3qBrPHXjY83VZ4avabeugBOWxLSlfZwz7YqQdYNQVlXfW57aT1OCs0HQEmdtkqg`
-const invalid_JWT_is_non_staff_no_subject_256 = `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJnbG9iYWwiOnsibmFtZSI6IkpvaG4gRG9lIiwicm9sZXMiOltdfSwiaWF0IjoxNTE2MjM5MDIyfQ.hNVhIDkL2CWLwmRDuQdJIpXdNTMpa1oIjZ6jBT169UFpaCSreNNzeA5zaqMd1Kj0Tx6i2VjwPRHOpzqPpaY3kIWyjc1zfvh-tQ9KiCnNXFYQ3voXu0pj4u1l3HqXgjzX7oghGT-UdkujaBYito9Bd85JHVERedkUWCcmFXM_T-kzn-_br2-ODP2NWhTsv8-VZm5EZYqCa2hH31QPsQF5MBl67bA0HgKGFgoRvaEH72fVoJHnQ7ZwtcvEMFOA6ag-Q7PELN3LNNH-I-RQtScwJu1uJP2sPYnrRX0N-sNr_8vLag_RcWbFZcnZiRmCmg91vQzr44zKXjmDFAsSXwbSZA`
 
 const pemPublicKeyRS256 = `-----BEGIN PUBLIC KEY-----
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAu1SU1LfVLPHCozMxH2Mo
@@ -68,7 +60,7 @@ func TestParseAuthCookie(t *testing.T) {
 				Name:  "test-cookie",
 				Value: "cookie-value",
 			},
-			expected: "Bearer cookie-value",
+			expected: "cookie-value",
 		},
 		{
 			name:      "Should return empty string when cookie name doesn't match",
@@ -93,7 +85,7 @@ func TestParseAuthCookie(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 
-			r, err := http.NewRequest("GET", "/", nil)
+			r, err := http.NewRequestWithContext(context.TODO(), "GET", "/", nil)
 			require.NoError(t, err)
 			r.AddCookie(tt.inputCookie)
 
@@ -103,86 +95,6 @@ func TestParseAuthCookie(t *testing.T) {
 		})
 	}
 
-}
-
-func TestParseBearerToken(t *testing.T) {
-
-	strPtr := func(s string) *string {
-		return &s
-	}
-
-	tests := []struct {
-		name                 string
-		inputTokenCookieName string
-		inputAuthHeaderValue *string
-		inputCookie          *http.Cookie
-		expected             string
-	}{
-		{
-			name:                 "Header present, should get value from auth header",
-			inputAuthHeaderValue: strPtr("Bearer header-value"),
-			inputTokenCookieName: "doesn't matter",
-			inputCookie:          nil,
-			expected:             "Bearer header-value",
-		},
-		{
-			name:                 "Header not present, should get cookie value",
-			inputAuthHeaderValue: nil,
-			inputTokenCookieName: "test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		{
-			name:                 "Make sure TokenCookieName from config is honored",
-			inputAuthHeaderValue: nil,
-			inputTokenCookieName: "another-test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "another-test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		{
-			name:                 "Existing but empty header leads to the cookie being used",
-			inputAuthHeaderValue: strPtr(""),
-			inputTokenCookieName: "another-test-cookie",
-			inputCookie: &http.Cookie{
-				Name:  "another-test-cookie",
-				Value: "cookie-value",
-			},
-			expected: "Bearer cookie-value",
-		},
-		// two more test cases are already covered via TestParseAuthCookie
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-
-			r, err := http.NewRequest("GET", "/", nil)
-			require.NoError(t, err)
-
-			if tt.inputAuthHeaderValue != nil {
-				r.Header.Add(headers.Authorization, *tt.inputAuthHeaderValue)
-			}
-			if tt.inputCookie != nil {
-				r.AddCookie(tt.inputCookie)
-			}
-
-			// We only need to fill a single field, the others are not used.
-			securityConf := &config.SecurityConfig{
-				Oidc: config.OpenIdConnectConfig{
-					TokenCookieName: tt.inputTokenCookieName,
-				},
-			}
-
-			value := parseBearerToken(r, securityConf)
-
-			require.Equal(t, tt.expected, value)
-		})
-	}
 }
 
 func TestKeyFuncForKey(t *testing.T) {
@@ -370,10 +282,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "John Doe",
-							Roles: []string{"admin"},
-						},
+						Name:   "John Doe",
+						Groups: []string{"admin"},
 					},
 				},
 				shouldFail: false,
@@ -396,10 +306,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "",
-							Roles: nil,
-						},
+						Name:   "",
+						Groups: nil,
 					},
 				},
 				shouldFail: false,
@@ -448,10 +356,8 @@ func TestCheckRequestAuthorization(t *testing.T) {
 						},
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Name:  "John Doe",
-							Roles: []string{"admin", "staff", "goh", "press"},
-						},
+						Name:   "John Doe",
+						Groups: []string{"admin", "staff", "goh", "press"},
 					},
 				},
 				shouldFail: false,
@@ -472,7 +378,7 @@ func TestCheckRequestAuthorization(t *testing.T) {
 				},
 			}
 
-			r, err := http.NewRequest("GET", "/", nil)
+			r, err := http.NewRequestWithContext(context.TODO(), "GET", "/", nil)
 			require.NoError(t, err)
 
 			if tt.args.xAPIKeyHeader != "" {
@@ -498,7 +404,7 @@ func TestCheckRequestAuthorization(t *testing.T) {
 				}
 
 				if tt.expected.jwt != "" {
-					value, ok := r.Context().Value(common.CtxKeyToken{}).(string)
+					value, ok := r.Context().Value(common.CtxKeyIdToken{}).(string)
 					if !ok {
 						require.FailNow(t, "expected type string")
 					}

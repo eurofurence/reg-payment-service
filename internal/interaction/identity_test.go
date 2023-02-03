@@ -10,8 +10,9 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
-func TestNewIdentityManager(t *testing.T) {
+// note: there is a TestMain that loads configuration
 
+func TestNewIdentityManager(t *testing.T) {
 	type args struct {
 		inputJWT    string
 		inputAPIKey string
@@ -52,11 +53,9 @@ func TestNewIdentityManager(t *testing.T) {
 						Subject: "123456",
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Roles: []string{"admin", "test"},
-							Name:  "Peter",
-							EMail: "peter@peter.eu",
-						},
+						Groups: []string{"admin", "test"},
+						Name:   "Peter",
+						EMail:  "peter@peter.eu",
 					},
 				},
 			},
@@ -76,11 +75,9 @@ func TestNewIdentityManager(t *testing.T) {
 						Subject: "123456",
 					},
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Roles: []string{"staff", "test"},
-							Name:  "Peter",
-							EMail: "peter@peter.eu",
-						},
+						Groups: []string{"staff", "test"},
+						Name:   "Peter",
+						EMail:  "peter@peter.eu",
 					},
 				},
 			},
@@ -115,9 +112,7 @@ func TestNewIdentityManager(t *testing.T) {
 				inputAPIKey: "",
 				inputClaims: &common.AllClaims{
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Roles: []string{""},
-						},
+						Groups: []string{""},
 					},
 				},
 			},
@@ -132,9 +127,7 @@ func TestNewIdentityManager(t *testing.T) {
 				inputAPIKey: "also valid",
 				inputClaims: &common.AllClaims{
 					CustomClaims: common.CustomClaims{
-						Global: common.GlobalClaims{
-							Roles: []string{""},
-						},
+						Groups: []string{""},
 					},
 				},
 			},
@@ -152,19 +145,20 @@ func TestNewIdentityManager(t *testing.T) {
 			}
 
 			if tt.args.inputJWT != "" {
-				ctx = context.WithValue(ctx, common.CtxKeyToken{}, tt.args.inputJWT)
+				ctx = context.WithValue(ctx, common.CtxKeyIdToken{}, tt.args.inputJWT)
 			}
 
 			if tt.args.inputClaims != nil {
 				ctx = context.WithValue(ctx, common.CtxKeyClaims{}, tt.args.inputClaims)
 			}
 
-			mgr := NewIdentityManager(ctx)
+			mgr, err := NewIdentityManager(ctx)
+			require.Nil(t, err)
 
 			require.Equal(t, tt.expected.isAdmin, mgr.IsAdmin())
 			require.Equal(t, tt.expected.isAPITokenCall, mgr.IsAPITokenCall())
 			require.Equal(t, tt.expected.isRegisteredUser, mgr.IsRegisteredUser())
-			require.Equal(t, tt.expected.roles, mgr.roles)
+			require.Equal(t, tt.expected.roles, mgr.groups)
 			require.Equal(t, tt.expected.subject, mgr.Subject())
 
 		})

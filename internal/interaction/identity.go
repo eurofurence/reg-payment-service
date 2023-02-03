@@ -2,13 +2,14 @@ package interaction
 
 import (
 	"context"
+	"github.com/eurofurence/reg-payment-service/internal/config"
 
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
 type IdentityManager struct {
 	subject          string
-	roles            []string
+	groups           []string
 	isAdmin          bool
 	isAPITokenCall   bool
 	isRegisteredUser bool
@@ -30,29 +31,33 @@ func (i *IdentityManager) Subject() string {
 	return i.subject
 }
 
-func NewIdentityManager(ctx context.Context) *IdentityManager {
+func NewIdentityManager(ctx context.Context) (*IdentityManager, error) {
 	manager := &IdentityManager{}
-	if _, ok := ctx.Value(common.CtxKeyAPIKey{}).(string); ok {
-		manager.isAPITokenCall = true
-		return manager
+
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
 	}
 
-	if _, ok := ctx.Value(common.CtxKeyToken{}).(string); ok {
-		if claims, ok := ctx.Value(common.CtxKeyClaims{}).(*common.AllClaims); ok {
-			manager.subject = claims.Subject
-			manager.roles = claims.Global.Roles
+	if _, ok := ctx.Value(common.CtxKeyAPIKey{}).(string); ok {
+		manager.isAPITokenCall = true
+		return manager, nil
+	}
 
-			manager.isRegisteredUser = true
+	if claims, ok := ctx.Value(common.CtxKeyClaims{}).(*common.AllClaims); ok {
+		manager.subject = claims.Subject
+		manager.groups = claims.Groups
 
-			for _, role := range claims.Global.Roles {
-				if role == "admin" {
-					manager.isRegisteredUser = false
-					manager.isAdmin = true
-					break
-				}
+		manager.isRegisteredUser = true
+
+		for _, group := range claims.Groups {
+			if group == conf.Security.Oidc.AdminGroup {
+				manager.isRegisteredUser = false
+				manager.isAdmin = true
+				break
 			}
 		}
 	}
 
-	return manager
+	return manager, nil
 }

@@ -3,7 +3,6 @@ package interaction
 import (
 	"context"
 	"errors"
-
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
