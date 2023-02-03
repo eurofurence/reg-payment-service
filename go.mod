@@ -12,7 +12,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.4.3
 	github.com/google/uuid v1.3.0
 	gorm.io/driver/mysql v1.4.5
-	gorm.io/gorm v1.24.3
+	gorm.io/gorm v1.24.4
 )
 
 require github.com/rs/zerolog v1.29.0
