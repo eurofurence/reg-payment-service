@@ -18,13 +18,17 @@ type Impl struct {
 	baseUrl                   string
 }
 
-func New(attendeeServiceBaseUrl string, conf *config.SecurityConfig) (AttendeeService, error) {
+func New(attendeeServiceBaseUrl string) (AttendeeService, error) {
 	if attendeeServiceBaseUrl == "" {
 		return nil, errors.New("service.attendee_service not configured. This service cannot function without the attendee service, though you can run it in inmemory database mode for development.")
 	}
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
 
 	paymentsChangedClient, err := downstreams.ClientWith(
-		downstreams.ApiTokenRequestManipulator(conf.Fixed.Api),
+		downstreams.ApiTokenRequestManipulator(conf.Security.Fixed.Api),
 		"attendee-service-webhook-breaker",
 	)
 	if err != nil {
@@ -32,7 +36,7 @@ func New(attendeeServiceBaseUrl string, conf *config.SecurityConfig) (AttendeeSe
 	}
 
 	listMyRegistrationsClient, err := downstreams.ClientWith(
-		downstreams.CookiesOrAuthHeaderForwardingRequestManipulator(conf),
+		downstreams.CookiesOrAuthHeaderForwardingRequestManipulator(conf.Security),
 		"attendee-service-breaker",
 	)
 	if err != nil {

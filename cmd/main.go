@@ -70,7 +70,7 @@ func main() {
 	//playDatabase(ctx, repo)
 
 	attClient := constructOrFail(ctx, logger, func() (attendeeservice.AttendeeService, error) {
-		return attendeeservice.New(conf.Service.AttendeeService, &conf.Security)
+		return attendeeservice.New(conf.Service.AttendeeService)
 	})
 
 	ccClient := constructOrFail(ctx, logger, func() (cncrdadapter.CncrdAdapter, error) {
@@ -78,11 +78,11 @@ func main() {
 	})
 
 	_ = constructOrFail(ctx, logger, func() (authservice.AuthService, error) {
-		return authservice.New(&conf.Security)
+		return authservice.New()
 	})
 
 	i := constructOrFail(ctx, logger, func() (interaction.Interactor, error) {
-		return interaction.NewServiceInteractor(repo, attClient, ccClient, &conf.Security)
+		return interaction.NewServiceInteractor(repo, attClient, ccClient)
 	})
 
 	logger.Debug("Setting up router")

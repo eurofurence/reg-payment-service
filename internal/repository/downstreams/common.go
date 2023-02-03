@@ -51,7 +51,7 @@ func AccessTokenForwardingRequestManipulator() aurestclientapi.RequestManipulato
 	}
 }
 
-func CookiesOrAuthHeaderForwardingRequestManipulator(conf *config.SecurityConfig) aurestclientapi.RequestManipulatorCallback {
+func CookiesOrAuthHeaderForwardingRequestManipulator(conf config.SecurityConfig) aurestclientapi.RequestManipulatorCallback {
 	return func(ctx context.Context, r *http.Request) {
 		r.Header.Add(middleware.RequestIDHeader, requestIDFromContext(ctx))
 

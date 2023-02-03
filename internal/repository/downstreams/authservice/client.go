@@ -18,8 +18,13 @@ type Impl struct {
 	baseUrl string
 }
 
-func newClient(conf *config.SecurityConfig) (AuthService, error) {
-	requestManipulator := downstreams.CookiesOrAuthHeaderForwardingRequestManipulator(conf)
+func newClient() (AuthService, error) {
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	requestManipulator := downstreams.CookiesOrAuthHeaderForwardingRequestManipulator(conf.Security)
 
 	httpClient, err := auresthttpclient.New(0, nil, requestManipulator)
 	if err != nil {
@@ -38,7 +43,7 @@ func newClient(conf *config.SecurityConfig) (AuthService, error) {
 
 	return &Impl{
 		client:  circuitBreakerClient,
-		baseUrl: conf.Oidc.AuthService,
+		baseUrl: conf.Security.Oidc.AuthService,
 	}, nil
 }
 

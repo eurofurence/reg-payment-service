@@ -29,7 +29,10 @@ var (
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	logger := logging.LoggerFromContext(ctx)
-	mgr := NewIdentityManager(ctx, s.securityConfig)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return nil, err
+	}
 
 	if mgr.IsRegisteredUser() {
 		regIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
@@ -87,7 +90,11 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		tran.EffectiveDate = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 
-	mgr := NewIdentityManager(ctx, s.securityConfig)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
 		return s.createTransactionWithElevatedAccess(ctx, tran, mgr)
 	}
@@ -176,7 +183,11 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 }
 
 func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
-	mgr := NewIdentityManager(ctx, s.securityConfig)
+	mgr, err := NewIdentityManager(ctx)
+	if err != nil {
+		return err
+	}
+
 	logger := logging.LoggerFromContext(ctx)
 
 	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {

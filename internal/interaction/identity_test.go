@@ -2,7 +2,6 @@ package interaction
 
 import (
 	"context"
-	"github.com/eurofurence/reg-payment-service/internal/config"
 	"testing"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -11,14 +10,9 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
-var securityConfig = config.SecurityConfig{
-	Oidc: config.OpenIdConnectConfig{
-		AdminGroup: "admin",
-	},
-}
+// note: there is a TestMain that loads configuration
 
 func TestNewIdentityManager(t *testing.T) {
-
 	type args struct {
 		inputJWT    string
 		inputAPIKey string
@@ -158,7 +152,8 @@ func TestNewIdentityManager(t *testing.T) {
 				ctx = context.WithValue(ctx, common.CtxKeyClaims{}, tt.args.inputClaims)
 			}
 
-			mgr := NewIdentityManager(ctx, &securityConfig)
+			mgr, err := NewIdentityManager(ctx)
+			require.Nil(t, err)
 
 			require.Equal(t, tt.expected.isAdmin, mgr.IsAdmin())
 			require.Equal(t, tt.expected.isAPITokenCall, mgr.IsAPITokenCall())

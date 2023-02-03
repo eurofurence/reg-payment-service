@@ -12,6 +12,8 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/cncrdadapter"
 )
 
+// note: there is a TestMain that loads configuration
+
 func TestNewServiceInteractor(t *testing.T) {
 	type args struct {
 		repo      database.Repository
@@ -66,7 +68,7 @@ func TestNewServiceInteractor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			i, err := NewServiceInteractor(tt.args.repo, tt.args.attClient, tt.args.ccClient, &securityConfig)
+			i, err := NewServiceInteractor(tt.args.repo, tt.args.attClient, tt.args.ccClient)
 			if tt.expected.err != nil {
 				require.EqualError(t, err, tt.expected.err.Error())
 				require.Nil(t, i)

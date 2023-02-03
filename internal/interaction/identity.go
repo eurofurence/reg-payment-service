@@ -31,11 +31,17 @@ func (i *IdentityManager) Subject() string {
 	return i.subject
 }
 
-func NewIdentityManager(ctx context.Context, conf *config.SecurityConfig) *IdentityManager {
+func NewIdentityManager(ctx context.Context) (*IdentityManager, error) {
 	manager := &IdentityManager{}
+
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	if _, ok := ctx.Value(common.CtxKeyAPIKey{}).(string); ok {
 		manager.isAPITokenCall = true
-		return manager
+		return manager, nil
 	}
 
 	if claims, ok := ctx.Value(common.CtxKeyClaims{}).(*common.AllClaims); ok {
@@ -45,7 +51,7 @@ func NewIdentityManager(ctx context.Context, conf *config.SecurityConfig) *Ident
 		manager.isRegisteredUser = true
 
 		for _, group := range claims.Groups {
-			if group == conf.Oidc.AdminGroup {
+			if group == conf.Security.Oidc.AdminGroup {
 				manager.isRegisteredUser = false
 				manager.isAdmin = true
 				break
@@ -53,5 +59,5 @@ func NewIdentityManager(ctx context.Context, conf *config.SecurityConfig) *Ident
 		}
 	}
 
-	return manager
+	return manager, nil
 }

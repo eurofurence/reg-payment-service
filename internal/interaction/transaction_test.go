@@ -244,7 +244,7 @@ func TestGetTransactionsForDebitor(t *testing.T) {
 				ListMyRegistrationIdsFunc: tt.args.listRegistrationsFunc,
 			}
 
-			i, err := NewServiceInteractor(db, asm, &CncrdAdapterMock{}, &securityConfig)
+			i, err := NewServiceInteractor(db, asm, &CncrdAdapterMock{})
 			require.NoError(t, err)
 
 			rt, err := i.GetTransactionsForDebitor(tt.args.ctx, tt.args.query)
@@ -273,7 +273,6 @@ func TestGetTransactionsForDebitor(t *testing.T) {
 }
 
 func TestCreateTransaction(t *testing.T) {
-
 	type args struct {
 		paymentsChangedFunc   func(ctx context.Context, debitorId uint) error
 		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
@@ -730,7 +729,7 @@ func TestCreateTransaction(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
+			i, err := NewServiceInteractor(db, asm, ccm)
 			require.NoError(t, err)
 
 			res, err := i.CreateTransaction(tt.args.ctx, tt.args.transaction)
@@ -929,7 +928,7 @@ func TestUpdateTransaction(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
+			i, err := NewServiceInteractor(db, asm, ccm)
 			require.NoError(t, err)
 
 			err = i.UpdateTransaction(tt.args.ctx, tt.args.transaction)
@@ -1088,7 +1087,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 			db := inmemory.NewInMemoryProvider()
 			seedDB(db, tt.args.seed)
 
-			i, err := NewServiceInteractor(db, asm, ccm, &securityConfig)
+			i, err := NewServiceInteractor(db, asm, ccm)
 			require.NoError(t, err)
 
 			if tt.args.ctx == nil {

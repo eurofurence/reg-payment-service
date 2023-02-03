@@ -7,9 +7,14 @@ import (
 
 var activeInstance AuthService
 
-func New(conf *config.SecurityConfig) (AuthService, error) {
-	if conf.Oidc.AuthService != "" {
-		instance, err := newClient(conf)
+func New() (AuthService, error) {
+	conf, err := config.GetApplicationConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	if conf.Security.Oidc.AuthService != "" {
+		instance, err := newClient()
 		activeInstance = instance
 		return instance, err
 	} else {

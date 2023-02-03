@@ -3,8 +3,6 @@ package interaction
 import (
 	"context"
 	"errors"
-	"github.com/eurofurence/reg-payment-service/internal/config"
-
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 	"github.com/eurofurence/reg-payment-service/internal/repository/database"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
@@ -24,13 +22,11 @@ type serviceInteractor struct {
 	store          database.Repository
 	attendeeClient attendeeservice.AttendeeService
 	cncrdClient    cncrdadapter.CncrdAdapter
-	securityConfig *config.SecurityConfig
 }
 
 func NewServiceInteractor(r database.Repository,
 	attClient attendeeservice.AttendeeService,
 	ccClient cncrdadapter.CncrdAdapter,
-	securityConfig *config.SecurityConfig,
 ) (Interactor, error) {
 
 	if r == nil {
@@ -49,6 +45,5 @@ func NewServiceInteractor(r database.Repository,
 		store:          r,
 		attendeeClient: attClient,
 		cncrdClient:    ccClient,
-		securityConfig: securityConfig,
 	}, nil
 }
