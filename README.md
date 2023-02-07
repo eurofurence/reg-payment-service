@@ -1,7 +1,6 @@
 # reg-payment-service
 
 <img src="https://github.com/eurofurence/reg-payment-service/actions/workflows/go.yml/badge.svg" alt="test status"/>
-<img src="https://github.com/eurofurence/reg-payment-service/actions/workflows/codeql-analysis.yml/badge.svg" alt="code quality status"/>
 
 ## Overview
 
@@ -21,3 +20,7 @@ If you place this repository OUTSIDE of your gopath, `go build cmd/main.go` and 
 required dependencies by default.
 
 In order to generate mocks, the service is using https://github.com/matryer/moq. Install the binary via `go install github.com/matryer/moq@latest`
+
+## Open Issues and Ideas
+
+We track open issues as GitHub issues on this repository once it becomes clear what exactly needs to be done.
