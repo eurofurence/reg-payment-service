@@ -3,15 +3,18 @@ package middleware
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"os"
+	"testing"
+
 	aulogging "github.com/StephanHCB/go-autumn-logging"
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/stretchr/testify/require"
+
 	"github.com/eurofurence/reg-payment-service/docs"
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/authservice"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/stretchr/testify/require"
-	"os"
-	"testing"
 )
 
 // --- test setup ---
@@ -24,9 +27,24 @@ func TestMain(m *testing.M) {
 
 var authServiceMock authservice.Mock
 
+var securityConfig256 = config.SecurityConfig{
+	Fixed: config.FixedTokenConfig{
+		Api: valid_api_token,
+	},
+	Oidc: config.OpenIdConnectConfig{
+		IdTokenCookieName:     "JWT",
+		AccessTokenCookieName: "AUTH",
+		TokenPublicKeysPEM:    []string{pemPublicKeyRS256},
+		AdminGroup:            "admin",
+	},
+}
+
 func tstSetup() {
 	aulogging.SetupNoLoggerForTesting()
 	authServiceMock = authservice.CreateMock()
+	// call to make sure to fill the parsed pems for the tests
+	CheckRequestAuthorization(&securityConfig256)
+
 }
 
 // --- tokens and security config ---
@@ -48,18 +66,6 @@ const valid_api_token = "api-token-for-testing-must-be-pretty-long"
 const invalid_access_token = "invalid-access"
 
 const valid_access_token = "valid-access"
-
-var securityConfig256 = config.SecurityConfig{
-	Fixed: config.FixedTokenConfig{
-		Api: valid_api_token,
-	},
-	Oidc: config.OpenIdConnectConfig{
-		IdTokenCookieName:     "JWT",
-		AccessTokenCookieName: "AUTH",
-		TokenPublicKeysPEM:    []string{pemPublicKeyRS256},
-		AdminGroup:            "admin",
-	},
-}
 
 // --- test case helpers ---
 
@@ -259,4 +265,48 @@ func TestCookiesExpiredJwt(t *testing.T) {
 	require.Nil(t, ctx.Value(common.CtxKeyAccessToken{}))
 	require.Nil(t, ctx.Value(common.CtxKeyClaims{}))
 	tstRequireNoAuthServiceCall(t)
+}
+
+// TODO Remove after legacy system was replaced with 2FA
+// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+func TestStoreAdminHeaderInContext(t *testing.T) {
+	docs.Description("stores the header value for legacy system admin calls")
+
+	tests := []struct {
+		name        string
+		shouldStore bool
+	}{
+		{
+			name:        "should not store value in context",
+			shouldStore: false,
+		},
+		{
+			name:        "should not store value in context",
+			shouldStore: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			ctx := context.Background()
+
+			r, err := http.NewRequest(http.MethodGet, "http://test.local", nil)
+			require.NoError(t, err)
+			if tt.shouldStore {
+				r.Header.Add(adminRequestHeader, "available")
+			}
+
+			ctx = storeAdminRequestHeaderIfAvailable(ctx, r)
+			val, ok := ctx.Value(common.CtxKeyAdminHeader{}).(string)
+			if tt.shouldStore {
+				require.True(t, ok)
+				require.NotEmpty(t, val)
+			} else {
+				require.False(t, ok)
+				require.Empty(t, val)
+			}
+		})
+	}
+
 }

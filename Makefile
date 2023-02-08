@@ -17,7 +17,7 @@ GOLANGCI_LINT ?= $(call tool,golangci-lint)
 DOCKER_COMPOSE ?= $(call tool, docker-compose)
 
 .PHONY: test
-test: lint
+test:
 	@$(GO) clean -testcache
 	$(GOTEST) $(GOTEST_ARGS) ./... -v
 

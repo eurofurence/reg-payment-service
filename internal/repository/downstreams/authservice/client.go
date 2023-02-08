@@ -3,14 +3,16 @@ package authservice
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"time"
+
 	aurestbreaker "github.com/StephanHCB/go-autumn-restclient-circuitbreaker/implementation/breaker"
 	aurestclientapi "github.com/StephanHCB/go-autumn-restclient/api"
 	auresthttpclient "github.com/StephanHCB/go-autumn-restclient/implementation/httpclient"
 	aurestlogging "github.com/StephanHCB/go-autumn-restclient/implementation/requestlogging"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams"
-	"net/http"
-	"time"
 )
 
 type Impl struct {

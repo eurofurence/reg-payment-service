@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/eurofurence/reg-payment-service/internal/config"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +14,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/eurofurence/reg-payment-service/internal/config"
 
 	"github.com/golang-jwt/jwt/v4"
 
@@ -40,7 +41,7 @@ func apiKeyCtx() context.Context {
 }
 
 func adminCtx() context.Context {
-	return contextWithClaims(&common.AllClaims{
+	ctx := contextWithClaims(&common.AllClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject: "1234567890",
 		},
@@ -48,6 +49,10 @@ func adminCtx() context.Context {
 			Groups: []string{"admin"},
 		},
 	})
+
+	// TODO remove after 2FA is available
+	// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+	return context.WithValue(ctx, common.CtxKeyAdminHeader{}, "available")
 }
 
 func attendeeCtx() context.Context {

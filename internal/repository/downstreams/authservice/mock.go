@@ -3,6 +3,7 @@ package authservice
 import (
 	"context"
 	"fmt"
+
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 

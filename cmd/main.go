@@ -3,9 +3,10 @@ package main
 import (
 	"errors"
 	"flag"
-	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/authservice"
 	"net/http"
 	"path/filepath"
+
+	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/authservice"
 
 	"github.com/eurofurence/reg-payment-service/internal/repository/database/inmemory"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/attendeeservice"
