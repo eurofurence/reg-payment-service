@@ -29,7 +29,7 @@ var (
 
 func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query entities.TransactionQuery) ([]entities.Transaction, error) {
 	logger := logging.LoggerFromContext(ctx)
-	mgr, err := NewIdentityManager(ctx)
+	mgr, err := NewRBACValidator(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 		tran.EffectiveDate = sql.NullTime{Time: time.Now(), Valid: true}
 	}
 
-	mgr, err := NewIdentityManager(ctx)
+	mgr, err := NewRBACValidator(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 }
 
 func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entities.Transaction) error {
-	mgr, err := NewIdentityManager(ctx)
+	mgr, err := NewRBACValidator(ctx)
 	if err != nil {
 		return err
 	}
@@ -282,7 +282,7 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 func (s *serviceInteractor) createTransactionWithElevatedAccess(
 	ctx context.Context,
 	tran *entities.Transaction,
-	mgr *IdentityManager) (*entities.Transaction, error) {
+	mgr *RBACValidator) (*entities.Transaction, error) {
 
 	logger := logging.LoggerFromContext(ctx)
 

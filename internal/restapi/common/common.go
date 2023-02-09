@@ -15,6 +15,10 @@ type (
 	CtxKeyAccessToken struct{}
 	CtxKeyAPIKey      struct{}
 	CtxKeyClaims      struct{}
+
+	// TODO Remove after legacy system was replaced with 2FA
+	// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+	CtxKeyAdminHeader struct{}
 )
 
 type CustomClaims struct {

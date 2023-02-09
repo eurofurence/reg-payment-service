@@ -5,19 +5,26 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
+	"net/http"
+	"strings"
+
+	"github.com/go-http-utils/headers"
+	"github.com/golang-jwt/jwt/v4"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
 	"github.com/eurofurence/reg-payment-service/internal/logging"
 	"github.com/eurofurence/reg-payment-service/internal/repository/downstreams/authservice"
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
-	"github.com/go-http-utils/headers"
-	"github.com/golang-jwt/jwt/v4"
-	"net/http"
-	"strings"
 )
 
 // nolint
-const apiKeyHeader = "X-Api-Key"
-const bearerPrefix = "Bearer "
+const (
+	apiKeyHeader = "X-Api-Key"
+	bearerPrefix = "Bearer "
+	// TODO Remove after legacy system was replaced with 2FA
+	// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+	adminRequestHeader = "X-Admin-Request"
+)
 
 // --- getting the values from the request ---
 
@@ -48,6 +55,18 @@ func fromAuthHeader(r *http.Request) string {
 
 func fromApiTokenHeader(r *http.Request) string {
 	return r.Header.Get(apiKeyHeader)
+}
+
+// TODO Remove after legacy system was replaced with 2FA
+// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+func storeAdminRequestHeaderIfAvailable(ctx context.Context, r *http.Request) context.Context {
+	adminHeader := r.Header.Get(adminRequestHeader)
+
+	if adminHeader == "" {
+		return ctx
+	}
+
+	return context.WithValue(ctx, common.CtxKeyAdminHeader{}, adminHeader)
 }
 
 // --- validating the individual pieces ---
@@ -146,7 +165,6 @@ func checkIdToken(ctx context.Context, conf *config.SecurityConfig, idTokenValue
 }
 
 // --- top level ---
-
 func checkAllAuthentication(ctx context.Context, conf *config.SecurityConfig, apiTokenHeaderValue string, authHeaderValue string, idTokenCookieValue string, accessTokenCookieValue string) (context.Context, string, error) {
 	var success bool
 	var err error
@@ -209,6 +227,7 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 			reqID := logging.GetRequestID(ctx)
 			logger := logging.LoggerFromContext(ctx)
 
+			ctx = storeAdminRequestHeaderIfAvailable(ctx, r)
 			apiTokenHeaderValue := fromApiTokenHeader(r)
 			authHeaderValue := fromAuthHeader(r)
 			idTokenCookieValue := parseAuthCookie(r, conf.Oidc.IdTokenCookieName)
@@ -223,7 +242,6 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 
 			r = r.WithContext(ctx)
 			next.ServeHTTP(w, r)
-			return
 		})
 	}
 }

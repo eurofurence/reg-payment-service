@@ -2,12 +2,13 @@ package interaction
 
 import (
 	"context"
+
 	"github.com/eurofurence/reg-payment-service/internal/config"
 
 	"github.com/eurofurence/reg-payment-service/internal/restapi/common"
 )
 
-type IdentityManager struct {
+type RBACValidator struct {
 	subject          string
 	groups           []string
 	isAdmin          bool
@@ -15,24 +16,24 @@ type IdentityManager struct {
 	isRegisteredUser bool
 }
 
-func (i *IdentityManager) IsAdmin() bool {
+func (i *RBACValidator) IsAdmin() bool {
 	return i.isAdmin
 }
 
-func (i *IdentityManager) IsAPITokenCall() bool {
+func (i *RBACValidator) IsAPITokenCall() bool {
 	return i.isAPITokenCall
 }
 
-func (i *IdentityManager) IsRegisteredUser() bool {
+func (i *RBACValidator) IsRegisteredUser() bool {
 	return i.isRegisteredUser && i.subject != ""
 }
 
-func (i *IdentityManager) Subject() string {
+func (i *RBACValidator) Subject() string {
 	return i.subject
 }
 
-func NewIdentityManager(ctx context.Context) (*IdentityManager, error) {
-	manager := &IdentityManager{}
+func NewRBACValidator(ctx context.Context) (*RBACValidator, error) {
+	manager := &RBACValidator{}
 
 	conf, err := config.GetApplicationConfig()
 	if err != nil {
@@ -51,7 +52,7 @@ func NewIdentityManager(ctx context.Context) (*IdentityManager, error) {
 		manager.isRegisteredUser = true
 
 		for _, group := range claims.Groups {
-			if group == conf.Security.Oidc.AdminGroup {
+			if group == conf.Security.Oidc.AdminGroup && hasValidAdminHeader(ctx) {
 				manager.isRegisteredUser = false
 				manager.isAdmin = true
 				break
@@ -60,4 +61,16 @@ func NewIdentityManager(ctx context.Context) (*IdentityManager, error) {
 	}
 
 	return manager, nil
+}
+
+// TODO remove after 2FA is available
+// See reference https://github.com/eurofurence/reg-payment-service/issues/57
+func hasValidAdminHeader(ctx context.Context) bool {
+	adminHeaderValue, ok := ctx.Value(common.CtxKeyAdminHeader{}).(string)
+	if !ok {
+		return false
+	}
+
+	// legacy system implementation requires check against constant value "available"
+	return adminHeaderValue == "available"
 }

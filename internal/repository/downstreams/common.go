@@ -3,9 +3,10 @@ package downstreams
 import (
 	"context"
 	"errors"
-	"github.com/eurofurence/reg-payment-service/internal/config"
 	"net/http"
 	"time"
+
+	"github.com/eurofurence/reg-payment-service/internal/config"
 
 	aurestlogging "github.com/StephanHCB/go-autumn-restclient/implementation/requestlogging"
 	"github.com/go-chi/chi/v5/middleware"
