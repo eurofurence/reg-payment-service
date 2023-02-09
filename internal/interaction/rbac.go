@@ -32,7 +32,6 @@ func (i *RBACValidator) Subject() string {
 	return i.subject
 }
 
-// TODO add check for admin header with constant value "available"
 func NewRBACValidator(ctx context.Context) (*RBACValidator, error) {
 	manager := &RBACValidator{}
 
