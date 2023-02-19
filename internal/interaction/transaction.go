@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"fmt"
 	"math/big"
-	"reflect"
 	"regexp"
 	"strings"
 	"time"
@@ -211,21 +210,35 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 
 	curTran := res[0]
 
-	// check if transaction should be deleted or not by an admin
-	if !reflect.ValueOf(tran.Deletion).IsZero() && mgr.IsAdmin() {
+	if curTran.TransactionType == entities.TransactionTypeDue {
+		return apierrors.NewForbidden("cannot change transactions of type due")
+	}
+
+	// check if a valid payment should be deleted or not by an admin
+	if tran.TransactionStatus == entities.TransactionStatusDeleted &&
+		curTran.TransactionStatus == entities.TransactionStatusValid &&
+		curTran.TransactionType == entities.TransactionTypePayment &&
+		mgr.IsAdmin() {
+
+		logger.Warn("admin trying to delete valid payment %s", tran.TransactionID)
+
 		// Within 3 calendar days of creation, for any transaction an admin may change
 		// - status -> deleted
 		const maxDaysForDeletion = 3.0
 		days := time.Now().UTC().Sub(curTran.CreatedAt.UTC()).Hours() / 24.0
 
 		if days > maxDaysForDeletion {
-			return apierrors.NewForbidden("unable to flag transaction as deleted after 3 days, please book a compensating transaction instead")
+			return apierrors.NewForbidden("unable to flag valid transaction as deleted after 3 days, please book a compensating transaction instead")
 		}
 
-		// update the deletion status with the current status that was
-		// TODO move logic to database
-		curTran.Deletion.Status = curTran.TransactionStatus
+		// remember old values and who made the change
+		curTran.Deletion = entities.Deletion{
+			Status:  curTran.TransactionStatus, // previous status
+			Comment: curTran.Comment,           // previous comment
+			By:      mgr.Subject(),             // identity of deleting user
+		}
 		curTran.TransactionStatus = entities.TransactionStatusDeleted
+		curTran.Comment = tran.Comment
 
 		if err := s.store.DeleteTransaction(ctx, curTran); err != nil {
 			return err
@@ -239,12 +252,10 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 			}
 		}
 
+		logger.Warn("admin successfully deleted valid payment %s", tran.TransactionID)
+
 		return nil
 
-	}
-
-	if curTran.TransactionType == entities.TransactionTypeDue {
-		return apierrors.NewForbidden("cannot change the transaction of type due")
 	}
 
 	requireHistorization := false
