@@ -202,7 +202,7 @@ func (m *mysqlConnector) DeleteTransaction(ctx context.Context, tr entities.Tran
 
 	res := m.db.WithContext(tCtx).
 		Model(&entities.Transaction{}).
-		Select([]string{"DeletedAt", "Deletion"}).
+		Select([]string{"deleted_at", "deleted_status", "deleted_comment", "deleted_by", "transaction_status", "comment"}).
 		Where(&entities.Transaction{
 			DebitorID:     tr.DebitorID,
 			TransactionID: tr.TransactionID,

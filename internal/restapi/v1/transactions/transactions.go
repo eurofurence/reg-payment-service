@@ -179,7 +179,7 @@ func createTransactionRequestHandler(r *http.Request) (*CreateTransactionRequest
 		request.Transaction.EffectiveDate = nowFunc().Format(isoDateFormat)
 	}
 
-	if err := validateTransaction(&request.Transaction); err != nil {
+	if err := validateTransaction(&request.Transaction, true); err != nil {
 		return nil, err
 	}
 
@@ -214,7 +214,7 @@ func updateTransactionRequestHandler(r *http.Request) (*UpdateTransactionRequest
 		return nil, errors.New("transaction id in payload must match URL parameter")
 	}
 
-	if err := validateTransaction(&request.Transaction); err != nil {
+	if err := validateTransaction(&request.Transaction, false); err != nil {
 		return nil, err
 	}
 
@@ -251,7 +251,7 @@ func initiatePaymentResponseHandler(ctx context.Context, res *InitiatePaymentRes
 	return json.NewEncoder(w).Encode(res)
 }
 
-func validateTransaction(t *Transaction) error {
+func validateTransaction(t *Transaction, forbidDeleted bool) error {
 	if t.DebitorID <= 0 {
 		return fmt.Errorf("invalid debitor id supplied - DebitorID: %d", t.DebitorID)
 	}
@@ -264,7 +264,7 @@ func validateTransaction(t *Transaction) error {
 		return fmt.Errorf("invalid payment method - Method: %s", url.QueryEscape(string(t.Method)))
 	}
 
-	if !t.Status.IsValid() || t.Status == entities.TransactionStatusDeleted {
+	if !t.Status.IsValid() || t.Status == entities.TransactionStatusDeleted && forbidDeleted {
 		return fmt.Errorf("invalid transaction status - Status: %s", url.QueryEscape(string(t.Status)))
 	}
 

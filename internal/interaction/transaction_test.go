@@ -792,43 +792,41 @@ func TestUpdateTransaction(t *testing.T) {
 			},
 		},
 		{
-			name: "should return an error when admin is trying to delete a transaction which is older than three days",
+			name: "should return an error when admin is trying to delete a valid payment which is older than three days",
 			args: args{
 				transaction: &entities.Transaction{
 					DebitorID:         1,
 					TransactionID:     "12345",
 					TransactionStatus: entities.TransactionStatusDeleted,
-					Deletion: entities.Deletion{
-						Comment: "deleted for a reason",
-						By:      "Kevin",
-					},
+					TransactionType:   entities.TransactionTypePayment,
+					Comment:           "deleted for a reason",
 				},
 				seed: []entities.Transaction{
 					{
 						Model: gorm.Model{
 							CreatedAt: time.Now().AddDate(0, 0, -3).Add(-time.Second * 10),
 						},
-						DebitorID:     1,
-						TransactionID: "12345",
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionStatus: entities.TransactionStatusValid,
+						TransactionType:   entities.TransactionTypePayment,
 					},
 				},
 				ctx: adminCtx(),
 			},
 			expected: expected{
-				err: apierrors.NewForbidden("unable to flag transaction as deleted after 3 days, please book a compensating transaction instead"),
+				err: apierrors.NewForbidden("unable to flag valid transaction as deleted after 3 days, please book a compensating transaction instead"),
 			},
 		},
 		{
-			name: "should succesfully let admin delete the transaction when all conditions met",
+			name: "should succesfully let admin delete a valid payment when all conditions met",
 			args: args{
 				transaction: &entities.Transaction{
 					DebitorID:         1,
 					TransactionID:     "12345",
 					TransactionStatus: entities.TransactionStatusDeleted,
-					Deletion: entities.Deletion{
-						Comment: "deleted for a reason",
-						By:      "Kevin",
-					},
+					TransactionType:   entities.TransactionTypePayment,
+					Comment:           "deleted for a reason",
 				},
 				seed: []entities.Transaction{
 					{
@@ -836,7 +834,9 @@ func TestUpdateTransaction(t *testing.T) {
 						Model: gorm.Model{
 							CreatedAt: time.Now().AddDate(0, 0, -1),
 						},
-						TransactionID: "12345",
+						TransactionID:     "12345",
+						TransactionStatus: entities.TransactionStatusValid,
+						TransactionType:   entities.TransactionTypePayment,
 					},
 				},
 				ctx: adminCtx(),
@@ -864,7 +864,7 @@ func TestUpdateTransaction(t *testing.T) {
 				ctx: adminCtx(),
 			},
 			expected: expected{
-				err: apierrors.NewForbidden("cannot change the transaction of type due"),
+				err: apierrors.NewForbidden("cannot change transactions of type due"),
 			},
 		},
 		{
