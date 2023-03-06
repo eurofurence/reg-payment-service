@@ -96,6 +96,12 @@ func checkAccessToken(ctx context.Context, conf *config.SecurityConfig, accessTo
 				return ctx, false, fmt.Errorf("request failed access token check, denying: %s", err.Error())
 			}
 
+			if conf.Oidc.Audience != "" {
+				if len(userInfo.Audiences) != 1 || userInfo.Audiences[0] != conf.Oidc.Audience {
+					return ctx, false, errors.New("token audience does not match")
+				}
+			}
+
 			overwriteClaims := common.AllClaims{
 				RegisteredClaims: jwt.RegisteredClaims{
 					Issuer:   conf.Oidc.Issuer,
