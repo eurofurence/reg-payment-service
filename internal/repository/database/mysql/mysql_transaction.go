@@ -10,8 +10,10 @@ import (
 	"github.com/eurofurence/reg-payment-service/internal/entities"
 )
 
-var allowedFields = []string{
-	"Amount",
+var allowedFieldsForUpdate = []string{
+	"GrossCent",
+	"ISOCurrency",
+	"VatRate",
 	"TransactionStatus",
 	"Comment",
 	// TODO Missing payment processor information,
@@ -44,7 +46,7 @@ func (m *mysqlConnector) UpdateTransaction(ctx context.Context, tr entities.Tran
 
 	res := m.db.WithContext(tCtx).
 		Model(&entities.Transaction{}).
-		Select(allowedFields).
+		Select(allowedFieldsForUpdate).
 		Where(&entities.Transaction{
 			DebitorID:     tr.DebitorID,
 			TransactionID: tr.TransactionID,
