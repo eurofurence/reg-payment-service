@@ -138,7 +138,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                type: object
+                properties:
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
         '400':
           description: Request validation failed
           content:
@@ -289,7 +292,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Transaction'
+                type: object
+                properties:
+                  transaction:
+                    $ref: '#/components/schemas/Transaction'
         '400':
           description: Request validation failed, or the current dues balance for this debitor is 0
           content:
