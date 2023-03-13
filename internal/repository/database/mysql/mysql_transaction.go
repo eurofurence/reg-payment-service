@@ -15,7 +15,7 @@ var allowedFieldsForUpdate = []string{
 	"ISOCurrency",
 	"VatRate",
 	"TransactionStatus",
-	"Comment",
+	"comment",
 	// TODO Missing payment processor information,
 	"PaymentStartUrl",
 	"EffectiveDate",
