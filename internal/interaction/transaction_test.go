@@ -1211,12 +1211,12 @@ func TestIsValidStatusChange(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "should return false for tentative to valid",
+			name: "should return true for tentative to valid",
 			args: args{
 				oldStatus: entities.TransactionStatusTentative,
 				newStatus: entities.TransactionStatusValid,
 			},
-			expected: false,
+			expected: true,
 		},
 		{
 			name: "should return true for pending to valid",
