@@ -562,12 +562,13 @@ func isValidStatusChange(curTran, tran entities.Transaction) bool {
 	// The only possible change is status for payments
 	// * tentative -> pending (payment link has been used)
 	// * tentative -> deleted (payment link has been deleted)
+	// * tentative -> valid (payment link has been used, manual or automatic booking)
 	// * pending -> valid (payment is confirmed by admin or by payment provider)
 	// * pending -> deleted (payment has been deemed in error)
 
 	if curTran.TransactionStatus == entities.TransactionStatusTentative {
 		switch tran.TransactionStatus {
-		case entities.TransactionStatusPending, entities.TransactionStatusDeleted:
+		case entities.TransactionStatusPending, entities.TransactionStatusDeleted, entities.TransactionStatusValid:
 			return true
 		}
 
