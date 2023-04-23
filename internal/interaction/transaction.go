@@ -602,12 +602,15 @@ func shouldRequestPaymentLink(tran *entities.Transaction) bool {
 }
 
 func isValidStatusChange(curTran, tran entities.Transaction) bool {
+	// at this point we already know the request comes from an admin or api token
+
 	// The only possible change is status for payments
 	// * tentative -> pending (payment link has been used)
 	// * tentative -> deleted (payment link has been deleted)
 	// * tentative -> valid (payment link has been used, manual or automatic booking)
 	// * pending -> valid (payment is confirmed by admin or by payment provider)
 	// * pending -> deleted (payment has been deemed in error)
+	// * deleted -> valid (payment link used after deletion, or undo payment deletion performed by mistake)
 
 	if curTran.TransactionStatus == entities.TransactionStatusTentative {
 		switch tran.TransactionStatus {
@@ -621,6 +624,13 @@ func isValidStatusChange(curTran, tran entities.Transaction) bool {
 	if curTran.TransactionStatus == entities.TransactionStatusPending {
 		switch tran.TransactionStatus {
 		case entities.TransactionStatusValid, entities.TransactionStatusDeleted:
+			return true
+		}
+	}
+
+	if curTran.TransactionStatus == entities.TransactionStatusDeleted {
+		switch tran.TransactionStatus {
+		case entities.TransactionStatusValid:
 			return true
 		}
 	}

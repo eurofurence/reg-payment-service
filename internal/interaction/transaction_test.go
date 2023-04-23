@@ -1563,6 +1563,30 @@ func TestIsValidStatusChange(t *testing.T) {
 			},
 			expected: false,
 		},
+		{
+			name: "should return false for deleted to tentative",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusTentative,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for deleted to pending",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusPending,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for deleted to valid",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusValid,
+			},
+			expected: true,
+		},
 	}
 
 	for _, tt := range tests {
