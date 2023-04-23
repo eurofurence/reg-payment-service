@@ -342,8 +342,51 @@ func (s *serviceInteractor) createTransactionWithElevatedAccess(
 		// create new due transaction - must be created in status valid
 		tran.TransactionStatus = entities.TransactionStatusValid
 		err := s.store.CreateTransaction(ctx, *tran)
-		return tran, err
+		if err != nil {
+			return tran, err
+		}
+
+		// invalidate existing paylinks by marking their transactions deleted
+		//
+		// do not trigger payments changed webhook, because that may cause an update cycle
+		// (the only one adding dues is the attendee service anyway, and we're only changing tentative payments here, which do not count yet anyway)
+		err = s.invalidateTentativePayments(ctx, tran.DebitorID)
+		if err != nil {
+			return tran, err
+		}
+
+		return tran, nil
 	}
+}
+
+func (s *serviceInteractor) invalidateTentativePayments(ctx context.Context, debitorID int64) error {
+	transactions, err := s.store.GetTransactionsByFilter(ctx, entities.TransactionQuery{DebitorID: debitorID})
+	if err != nil {
+		return err
+	}
+
+	// delete existing transactions of type payment in status tentative (that is, paylinks)
+	for _, tt := range transactions {
+		if tt.TransactionType == entities.TransactionTypePayment && tt.TransactionStatus == entities.TransactionStatusTentative {
+			// remember old values and who made the change
+			tt.Deletion = entities.Deletion{
+				Status:  tt.TransactionStatus, // previous status
+				Comment: tt.Comment,           // previous comment
+				By:      "internal",           // identity of deleting user
+			}
+			tt.TransactionStatus = entities.TransactionStatusDeleted
+			tt.Comment = "voided paylink - dues have changed"
+
+			if err := s.store.DeleteTransaction(ctx, tt); err != nil {
+				return err
+			}
+
+			logger := logging.LoggerFromContext(ctx)
+			logger.Warn("deleted outdated tentative payment %s", tt.TransactionID)
+		}
+	}
+
+	return nil
 }
 
 func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, newTransaction *entities.Transaction) error {
