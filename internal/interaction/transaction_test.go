@@ -3,6 +3,7 @@ package interaction
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"regexp"
 	"testing"
@@ -51,6 +52,36 @@ func seedDB(db database.Repository, transactions []entities.Transaction) {
 	for _, tr := range transactions {
 		db.CreateTransaction(context.Background(), tr)
 	}
+}
+
+func compareDB(db database.Repository, expectedTransactions []entities.Transaction) error {
+	if len(expectedTransactions) == 0 {
+		return nil
+	}
+
+	storedTransactions, err := db.GetTransactionsByFilter(context.Background(), entities.TransactionQuery{})
+	if err != nil {
+		return err
+	}
+
+	if len(expectedTransactions) != len(storedTransactions) {
+		return errors.New("unexpected number of transactions")
+	}
+
+	for i, expect := range expectedTransactions {
+		stored := storedTransactions[i]
+		if stored.TransactionID != expect.TransactionID ||
+			stored.DebitorID != expect.DebitorID ||
+			stored.TransactionType != expect.TransactionType ||
+			stored.TransactionStatus != expect.TransactionStatus ||
+			stored.PaymentMethod != expect.PaymentMethod ||
+			stored.Amount.GrossCent != expect.Amount.GrossCent ||
+			stored.Amount.VatRate != expect.Amount.VatRate {
+			return fmt.Errorf("transaction %d does not match", i+1)
+		}
+	}
+
+	return nil
 }
 
 func TestGetTransactionsForDebitor(t *testing.T) {
@@ -280,6 +311,7 @@ func TestCreateTransaction(t *testing.T) {
 		transaction           *entities.Transaction
 		ctx                   context.Context
 		seed                  []entities.Transaction
+		expectedDbStateAfter  []entities.Transaction
 	}
 
 	type expected struct {
@@ -713,6 +745,286 @@ func TestCreateTransaction(t *testing.T) {
 				createPayLink: false,
 			},
 		},
+		{
+			name: "should delete existing tentative payment with pay link if new dues transaction created",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypeDue,
+					PaymentMethod:     entities.PaymentMethodInternal,
+					TransactionStatus: entities.TransactionStatusValid,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: apiKeyCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusTentative,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+				},
+				expectedDbStateAfter: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusDeleted, // this is the important part
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "3",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: false,
+			},
+		},
+		{
+			name: "should not touch existing pending payment with pay link if new dues transaction created",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypeDue,
+					PaymentMethod:     entities.PaymentMethodInternal,
+					TransactionStatus: entities.TransactionStatusValid,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: apiKeyCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusPending,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+				},
+				expectedDbStateAfter: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusPending,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "3",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: false,
+			},
+		},
+		{
+			name: "should not touch existing valid payment with pay link if new dues transaction created",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypeDue,
+					PaymentMethod:     entities.PaymentMethodInternal,
+					TransactionStatus: entities.TransactionStatusValid,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: apiKeyCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+				},
+				expectedDbStateAfter: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "3",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: false,
+			},
+		},
+		{
+			name: "should not delete existing tentative payment with pay link if new payment transaction created",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionType:   entities.TransactionTypePayment,
+					PaymentMethod:     entities.PaymentMethodTransfer,
+					TransactionStatus: entities.TransactionStatusValid,
+					Amount: entities.Amount{
+						ISOCurrency: "EUR",
+						GrossCent:   2000,
+						VatRate:     19.0,
+					},
+				},
+				ctx: adminCtx(),
+				seed: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusTentative,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+				},
+				expectedDbStateAfter: []entities.Transaction{
+					newTransaction(1, "1",
+						entities.TransactionTypeDue,
+						entities.PaymentMethodInternal,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "2",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodCredit,
+						entities.TransactionStatusTentative,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   3000,
+							VatRate:     19.0,
+						}),
+					newTransaction(1, "3",
+						entities.TransactionTypePayment,
+						entities.PaymentMethodTransfer,
+						entities.TransactionStatusValid,
+						entities.Amount{
+							ISOCurrency: "EUR",
+							GrossCent:   2000,
+							VatRate:     19.0,
+						}),
+				},
+			},
+			expected: expected{
+				err:           nil,
+				createPayLink: false,
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -745,6 +1057,7 @@ func TestCreateTransaction(t *testing.T) {
 				}
 			}
 
+			compareDB(db, tt.args.expectedDbStateAfter)
 		})
 	}
 }
@@ -1249,6 +1562,30 @@ func TestIsValidStatusChange(t *testing.T) {
 				newStatus: entities.TransactionStatusTentative,
 			},
 			expected: false,
+		},
+		{
+			name: "should return false for deleted to tentative",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusTentative,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for deleted to pending",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusPending,
+			},
+			expected: false,
+		},
+		{
+			name: "should return false for deleted to valid",
+			args: args{
+				oldStatus: entities.TransactionStatusDeleted,
+				newStatus: entities.TransactionStatusValid,
+			},
+			expected: true,
 		},
 	}
 
