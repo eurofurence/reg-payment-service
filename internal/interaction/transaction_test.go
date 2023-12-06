@@ -1265,6 +1265,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
 		createPaylinkFunc     func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error)
 		debitorID             int64
+		method                entities.PaymentMethod
 		ctx                   context.Context
 		seed                  []entities.Transaction
 	}
@@ -1407,7 +1408,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 				tt.args.ctx = context.TODO()
 			}
 
-			res, err := i.CreateTransactionForOutstandingDues(tt.args.ctx, tt.args.debitorID)
+			res, err := i.CreateTransactionForOutstandingDues(tt.args.ctx, tt.args.debitorID, tt.args.method)
 
 			if tt.expected.err != nil {
 				require.EqualError(t, err, tt.expected.err.Error())

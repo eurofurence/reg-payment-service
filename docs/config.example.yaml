@@ -5,7 +5,13 @@ service:
   transaction_id_prefix: "EF2023"
   allowed_currencies:
     - 'EUR'
-  payment_default_comment: 'manually initiated credit card payment'
+  payment_default_comment:
+    # this also controls which methods are available for the initiate-payment convenience function
+    credit: 'manually initiated credit card payment'
+    transfer: 'manually initiated SEPA payment'
+  # if configuring payment_default_comment[transfer], must also configure this. The constructed pay link
+  # will begin with this URL
+  public_sepa_link_url: 'https://example.com/sepa/pay/link'
 server:
   port: 9092
   read_timeout_seconds: 30

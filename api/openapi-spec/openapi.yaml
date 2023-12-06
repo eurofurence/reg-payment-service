@@ -267,9 +267,11 @@ paths:
       summary: Convenience endpoint for creating a payment via payment-link for all outstanding dues
       description: |-
         This endpoint adds a new transaction with
-          transaction_type=payment, method=credit, status=tentative
+          transaction_type=payment, method=credit (unless otherwise specified), status=tentative
         for the currently outstanding amount, and then a payment link is created and the transaction is saved
         including the payment link and its id.
+        
+        The allowed methods are controlled via the configuration by providing a default payment comment.
 
         This endpoint returns the created transaction so you get access to the payment link.
       operationId: initiatePaylinkTransaction
@@ -443,6 +445,13 @@ components:
           format: int64
           minimum: 1
           description: the debitor the transaction concerns (the badge id)
+        method:
+          type: string
+          enum:
+            - credit
+            - transfer
+          example: credit
+          description: the method to create a payment link for, defaults to credit
     Amount:
       type: object
       required:

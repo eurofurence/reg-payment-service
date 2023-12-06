@@ -104,7 +104,7 @@ func MakeUpdateTransactionEndpoint(i interaction.Interactor) common.Endpoint[Upd
 func MakeInitiatePaymentEndpoint(i interaction.Interactor) common.Endpoint[InitiatePaymentRequest, InitiatePaymentResponse] {
 	return func(ctx context.Context, request *InitiatePaymentRequest, logger logging.Logger) (*InitiatePaymentResponse, error) {
 		logger.Debug("initiating payment for debitor %d", request.TransactionInitiator.DebitorID)
-		res, err := i.CreateTransactionForOutstandingDues(ctx, request.TransactionInitiator.DebitorID)
+		res, err := i.CreateTransactionForOutstandingDues(ctx, request.TransactionInitiator.DebitorID, request.TransactionInitiator.Method)
 
 		if err != nil {
 			return nil, err

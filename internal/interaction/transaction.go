@@ -132,7 +132,7 @@ func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entitie
 	return nil, apierrors.NewForbidden("unable to determine the request permissions")
 }
 
-func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64) (*entities.Transaction, error) {
+func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Context, debitorID int64, method entities.PaymentMethod) (*entities.Transaction, error) {
 	appConfig, err := config.GetApplicationConfig()
 	if err != nil {
 		return nil, err
@@ -159,20 +159,21 @@ func (s *serviceInteractor) CreateTransactionForOutstandingDues(ctx context.Cont
 		return nil, apierrors.NewBadRequest("no outstanding dues for debitor")
 	}
 
-	defaultCommentFunc := func() string {
-		if strings.TrimSpace(appConfig.Service.DefaultPaymentComment) == "" {
-			return "manually initiated credit card payment"
-		}
+	if method == "" {
+		method = entities.PaymentMethodCredit
+	}
 
-		return appConfig.Service.DefaultPaymentComment
+	comment, ok := appConfig.Service.DefaultPaymentComment[string(method)]
+	if !ok || comment == "" {
+		return nil, apierrors.NewBadRequest("payment method not available for initiate-payment")
 	}
 
 	return s.CreateTransaction(ctx, &entities.Transaction{
 		DebitorID:         debitorID,
 		TransactionType:   entities.TransactionTypePayment,
-		PaymentMethod:     entities.PaymentMethodCredit,
+		PaymentMethod:     method,
 		TransactionStatus: entities.TransactionStatusTentative,
-		Comment:           defaultCommentFunc(),
+		Comment:           comment,
 		Amount: entities.Amount{
 			ISOCurrency: first.Amount.ISOCurrency,
 			VatRate:     first.Amount.VatRate,
@@ -400,8 +401,8 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 		return apierrors.NewForbidden(fmt.Sprintf("transactions for debitorID %d may not be altered", newTransaction.DebitorID))
 	}
 
-	// User may only create transactions which are valid for requesting payment links
-	if !shouldRequestPaymentLink(newTransaction) {
+	// User may only create transactions which are valid for requesting payment links (or creating them for SEPA)
+	if !shouldRequestPaymentLink(newTransaction) && !shouldCreateSepaLink(newTransaction) {
 		return apierrors.NewForbidden("transaction is not eligible for requesting a payment link")
 	}
 
@@ -566,19 +567,41 @@ func (s *serviceInteractor) isValidAttendeePayment(curTransactions []entities.Tr
 }
 
 func (s *serviceInteractor) createPaymentLink(ctx context.Context, tran entities.Transaction) (string, error) {
-	response, err := s.cncrdClient.CreatePaylink(ctx, cncrdadapter.PaymentLinkRequestDto{
-		ReferenceId: tran.TransactionID,
-		DebitorId:   tran.DebitorID,
-		Currency:    tran.Amount.ISOCurrency,
-		VatRate:     tran.Amount.VatRate,
-		AmountDue:   tran.Amount.GrossCent,
-	})
+	if tran.PaymentMethod == entities.PaymentMethodCredit {
+		// create a payment link using cncrd adapter
+		response, err := s.cncrdClient.CreatePaylink(ctx, cncrdadapter.PaymentLinkRequestDto{
+			ReferenceId: tran.TransactionID,
+			DebitorId:   tran.DebitorID,
+			Currency:    tran.Amount.ISOCurrency,
+			VatRate:     tran.Amount.VatRate,
+			AmountDue:   tran.Amount.GrossCent,
+		})
 
-	if err != nil {
-		return "", apierrors.NewInternalServerError(err.Error())
+		if err != nil {
+			return "", apierrors.NewInternalServerError(err.Error())
+		}
+
+		return response.Link, nil
+	}
+	if tran.PaymentMethod == entities.PaymentMethodTransfer {
+		// manually construct a "paylink" (actually just shows information and has two navigation buttons)
+		//
+		// this is hopefully temporary until GiroVend becomes available. Then, paylinks for SEPA transfers
+		// will also go through cncrdClient.
+		appConfig, err := config.GetApplicationConfig()
+		if err != nil {
+			return "", err
+		}
+
+		if appConfig.Service.PublicSepaLinkURL == "" {
+			return "", apierrors.NewInternalServerError("sepa paylink url not configured")
+		}
+
+		link := fmt.Sprintf("%s?transaction=%s", appConfig.Service.PublicSepaLinkURL, tran.TransactionID)
+		return link, nil
 	}
 
-	return response.Link, nil
+	return "", apierrors.NewInternalServerError("invalid payment method for paylink")
 }
 
 func isCurrencyAllowed(allowedCurrencies []string, isoCurrency string) bool {
@@ -598,6 +621,15 @@ func shouldRequestPaymentLink(tran *entities.Transaction) bool {
 	// transaction_type=payment, method=credit, status=tentative
 	return tran.TransactionType == entities.TransactionTypePayment &&
 		tran.PaymentMethod == entities.PaymentMethodCredit &&
+		tran.TransactionStatus == entities.TransactionStatusTentative
+}
+
+func shouldCreateSepaLink(tran *entities.Transaction) bool {
+	// We now have added support for creating a different type of payment link for SEPA transfers
+	//
+	// transaction_type=payment, method=transfer, status=tentative
+	return tran.TransactionType == entities.TransactionTypePayment &&
+		tran.PaymentMethod == entities.PaymentMethodTransfer &&
 		tran.TransactionStatus == entities.TransactionStatusTentative
 }
 
