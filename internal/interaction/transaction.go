@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -45,15 +46,27 @@ func (s *serviceInteractor) GetTransactionsForDebitor(ctx context.Context, query
 		}
 
 		// will not return deleted transactions
-		return s.store.GetTransactionsByFilter(ctx, query)
+		transactions, err := s.store.GetTransactionsByFilter(ctx, query)
+		sortByTxID(transactions)
+		return transactions, err
 	}
 
 	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
 		// return transactions in any state
-		return s.store.GetAdminTransactionsByFilter(ctx, query)
+		transactions, err := s.store.GetAdminTransactionsByFilter(ctx, query)
+		sortByTxID(transactions)
+		return transactions, err
 	}
 
 	return nil, apierrors.NewForbidden("unable to determine the request permissions")
+}
+
+func sortByTxID(transactions []entities.Transaction) {
+	sort.Slice(transactions, func(i, j int) bool {
+		a := transactions[i]
+		b := transactions[j]
+		return a.TransactionID < b.TransactionID
+	})
 }
 
 func (s *serviceInteractor) CreateTransaction(ctx context.Context, tran *entities.Transaction) (*entities.Transaction, error) {
