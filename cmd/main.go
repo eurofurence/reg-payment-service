@@ -127,7 +127,7 @@ func main() {
 func parseArgs(logger logging.Logger) error {
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configFilePath, "config", "", "The path to a configuration file")
-	flag.BoolVar(&migrate, "migrate", false, "Performs database migrations before the service starts")
+	flag.BoolVar(&migrate, "migrate-database", false, "Performs database migrations before the service starts")
 
 	flag.Parse()
 
