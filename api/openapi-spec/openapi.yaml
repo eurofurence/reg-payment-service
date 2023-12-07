@@ -217,12 +217,11 @@ paths:
       parameters:
         - name: id
           in: path
-          description: The id of the transaction to update
+          description: The reference id of the transaction to update
+          example: EF2022-000004-1028-200954-4711
           required: true
           schema:
-            type: integer
-            format: int64
-            minimum: 1
+            type: string
       requestBody:
         required: true
         description: The new transaction data. It is an error to change anything other than the status.
