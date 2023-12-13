@@ -15,6 +15,7 @@ import (
 
 func Create(server chi.Router) {
 	server.Get("/info/health", healthGet)
+	server.Get("/", healthGet)
 }
 
 func healthGet(w http.ResponseWriter, r *http.Request) {

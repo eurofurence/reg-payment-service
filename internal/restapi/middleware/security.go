@@ -171,9 +171,14 @@ func checkIdToken(ctx context.Context, conf *config.SecurityConfig, idTokenValue
 }
 
 // --- top level ---
-func checkAllAuthentication(ctx context.Context, conf *config.SecurityConfig, apiTokenHeaderValue string, authHeaderValue string, idTokenCookieValue string, accessTokenCookieValue string) (context.Context, string, error) {
+func checkAllAuthentication(ctx context.Context, method string, urlPath string, conf *config.SecurityConfig, apiTokenHeaderValue string, authHeaderValue string, idTokenCookieValue string, accessTokenCookieValue string) (context.Context, string, error) {
 	var success bool
 	var err error
+
+	// health check on / is allowed through
+	if method == http.MethodGet && urlPath == "/" {
+		return ctx, "", nil
+	}
 
 	// try api token first
 	ctx, success, err = checkApiToken(ctx, conf, apiTokenHeaderValue)
@@ -239,7 +244,7 @@ func CheckRequestAuthorization(conf *config.SecurityConfig) func(http.Handler) h
 			idTokenCookieValue := parseAuthCookie(r, conf.Oidc.IdTokenCookieName)
 			accessTokenCookieValue := parseAuthCookie(r, conf.Oidc.AccessTokenCookieName)
 
-			ctx, userFacingErrorMessage, err := checkAllAuthentication(ctx, conf, apiTokenHeaderValue, authHeaderValue, idTokenCookieValue, accessTokenCookieValue)
+			ctx, userFacingErrorMessage, err := checkAllAuthentication(ctx, r.Method, r.URL.Path, conf, apiTokenHeaderValue, authHeaderValue, idTokenCookieValue, accessTokenCookieValue)
 			if err != nil {
 				logger.Warn("authorization failed: %s: %s", userFacingErrorMessage, err.Error())
 				common.SendUnauthorizedResponse(w, reqID, logger, userFacingErrorMessage)

@@ -90,30 +90,40 @@ func tstRequireAuthServiceCall(t *testing.T, idToken string, accToken string) {
 }
 
 func tstNothingTestCase(t *testing.T, expectedMsg string, expectedErr string) context.Context {
-	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), &securityConfig256, "", "", "", "")
+	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), http.MethodGet, "/not/health", &securityConfig256, "", "", "", "")
 	tstRequire(t, actualMsg, actualErr, expectedMsg, expectedErr)
 	return ctx
 }
 
 func tstApiTokenTestCase(t *testing.T, apiTokenHeaderValue string, expectedUserMsg string, expectedLoggedErr string) context.Context {
-	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), &securityConfig256, apiTokenHeaderValue, "", "", "")
+	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), http.MethodGet, "/not/health", &securityConfig256, apiTokenHeaderValue, "", "", "")
 	tstRequire(t, actualMsg, actualErr, expectedUserMsg, expectedLoggedErr)
 	return ctx
 }
 
 func tstAuthHeaderTestCase(t *testing.T, authHeaderValue string, expectedUserMsg string, expectedLoggedErr string) context.Context {
-	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), &securityConfig256, "", authHeaderValue, "", "")
+	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), http.MethodGet, "/not/health", &securityConfig256, "", authHeaderValue, "", "")
 	tstRequire(t, actualMsg, actualErr, expectedUserMsg, expectedLoggedErr)
 	return ctx
 }
 
 func tstCookiesTestCase(t *testing.T, idTokenCookieValue string, accessTokenCookieValue string, expectedUserMsg string, expectedLoggedErr string) context.Context {
-	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), &securityConfig256, "", "", idTokenCookieValue, accessTokenCookieValue)
+	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), http.MethodGet, "/not/health", &securityConfig256, "", "", idTokenCookieValue, accessTokenCookieValue)
 	tstRequire(t, actualMsg, actualErr, expectedUserMsg, expectedLoggedErr)
 	return ctx
 }
 
 // --- test cases ---
+
+func TestHealthCheck(t *testing.T) {
+	docs.Description("health check is allowed through")
+	ctx, actualMsg, actualErr := checkAllAuthentication(context.Background(), http.MethodGet, "/", &securityConfig256, "", "", "", "")
+	tstRequire(t, actualMsg, actualErr, "", "")
+	require.Nil(t, ctx.Value(common.CtxKeyAPIKey{}))
+	require.Nil(t, ctx.Value(common.CtxKeyIdToken{}))
+	require.Nil(t, ctx.Value(common.CtxKeyAccessToken{}))
+	require.Nil(t, ctx.Value(common.CtxKeyClaims{}))
+}
 
 func TestNothingProvided(t *testing.T) {
 	docs.Description("not providing any authorization fails for this service")
