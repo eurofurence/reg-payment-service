@@ -65,6 +65,11 @@ func main() {
 	logger.Debug("applying environment variable config overrides")
 	envConfigOverrides(conf)
 
+	err = config.Validate(conf, logger.Warn)
+	if err != nil {
+		logger.Fatal("%v", err)
+	}
+
 	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
 		if conf.Database.Use == config.Mysql {
 			return mysql.NewMySQLConnector(conf.Database, logger)
@@ -161,10 +166,6 @@ func readConfigFile(logger logging.Logger) (*config.Application, error) {
 
 	conf, err := config.UnmarshalFromYamlConfiguration(f)
 	if err != nil {
-		return nil, err
-	}
-
-	if err := config.Validate(conf, logger.Warn); err != nil {
 		return nil, err
 	}
 
