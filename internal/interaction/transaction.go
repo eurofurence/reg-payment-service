@@ -203,7 +203,20 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 
 	logger := logging.LoggerFromContext(ctx)
 
-	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {
+	if mgr.IsAdmin() || mgr.IsAPITokenCall() {
+		// ok
+	} else if mgr.IsRegisteredUser() {
+		// registered users may update some of their own transactions, but only from tentative to pending
+		regIDs, err := s.attendeeClient.ListMyRegistrationIds(ctx)
+		if err != nil {
+			logger.Error("could not call the attendee service. [error]: %v", err)
+			return apierrors.NewInternalServerError("attendee service error - see log for details")
+		}
+
+		if !containsDebitor(regIDs, tran.DebitorID) {
+			return apierrors.NewForbidden(fmt.Sprintf("subject %s may not access transactions for debitor %d", mgr.Subject(), tran.DebitorID))
+		}
+	} else {
 		return apierrors.NewForbidden("no permission to update transaction")
 	}
 
@@ -226,6 +239,16 @@ func (s *serviceInteractor) UpdateTransaction(ctx context.Context, tran *entitie
 
 	if curTran.TransactionType == entities.TransactionTypeDue {
 		return apierrors.NewForbidden("cannot change transactions of type due")
+	}
+
+	if !mgr.IsAdmin() && !mgr.IsAPITokenCall() {
+		// non-admin users may only change transactions in status Tentative to Pending
+		if curTran.TransactionStatus != entities.TransactionStatusTentative ||
+			tran.TransactionStatus != entities.TransactionStatusPending ||
+			tran.TransactionType != entities.TransactionTypePayment {
+			logger.Warn("forbidden attempt to change transaction %s to target status %s by subject %s", tran.TransactionID, tran.TransactionStatus, mgr.Subject())
+			return apierrors.NewForbidden(fmt.Sprintf("subject %s may not make this transaction change - the attempt has been logged", mgr.Subject()))
+		}
 	}
 
 	// check if a valid payment should be deleted or not by an admin
