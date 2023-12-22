@@ -31,6 +31,7 @@ var errHelpRequested = errors.New("help text was requested")
 var (
 	showHelp       bool
 	migrate        bool
+	ecsJsonLogging bool
 	configFilePath string
 )
 
@@ -42,19 +43,20 @@ const (
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logging.SetupLogging("payment-service", false)
+	err := parseArgs()
+
+	logging.SetupLogging("payment-service", ecsJsonLogging)
 	logger := logging.NewLogger()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	logger.Debug("parsing command line flags")
-	if err := parseArgs(logger); err != nil {
+	if err != nil {
 		if !errors.Is(err, errHelpRequested) {
 			logger.Fatal("%v", err)
 		}
 		os.Exit(0)
 	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
 	logger.Debug("loading configuration")
 	conf, err := readConfigFile(logger)
@@ -129,10 +131,11 @@ func main() {
 	}
 }
 
-func parseArgs(logger logging.Logger) error {
+func parseArgs() error {
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configFilePath, "config", "", "The path to a configuration file")
 	flag.BoolVar(&migrate, "migrate-database", false, "Performs database migrations before the service starts")
+	flag.BoolVar(&ecsJsonLogging, "ecs-json-logging", false, "Enable json logging")
 
 	flag.Parse()
 
