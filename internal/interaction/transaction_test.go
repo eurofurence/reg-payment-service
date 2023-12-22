@@ -1077,20 +1077,127 @@ func TestUpdateTransaction(t *testing.T) {
 		status entities.TransactionStatus
 	}
 
+	attendeeRegistrationsFunc := func(ctx context.Context) ([]int64, error) {
+		return []int64{1, 2, 3}, nil
+	}
+
 	tests := []struct {
 		name     string
 		args     args
 		expected expected
 	}{
 		{
-			name: "should fail if not admin or service token call",
+			name: "should fail if not logged in",
 			args: args{
-				ctx: attendeeCtx(),
+				ctx: context.TODO(),
 			},
 			expected: expected{
 				err: apierrors.NewForbidden("no permission to update transaction"),
 			},
 		},
+		// --- user test cases ---
+		{
+			name: "user access should fail if attendee service unreachable",
+			args: args{
+				ctx:                   attendeeCtx(),
+				listRegistrationsFunc: func(ctx context.Context) ([]int64, error) { return nil, errors.New("connection refused") },
+			},
+			expected: expected{
+				err: apierrors.NewInternalServerError("attendee service error - see log for details"),
+			},
+		},
+		{
+			name: "user access should fail if not their registration",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID: 17,
+				},
+				ctx:                   attendeeCtx(),
+				listRegistrationsFunc: attendeeRegistrationsFunc,
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("subject 1234567890 may not access transactions for debitor 17"),
+			},
+		},
+		{
+			name: "user access should deny when trying to update non-tentative",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusPending,
+					TransactionType:   entities.TransactionTypePayment,
+				},
+				seed: []entities.Transaction{
+					{
+						Model: gorm.Model{
+							CreatedAt: time.Now().AddDate(0, 0, -3).Add(-time.Second * 10),
+						},
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionStatus: entities.TransactionStatusValid,
+						TransactionType:   entities.TransactionTypePayment,
+					},
+				},
+				ctx:                   attendeeCtx(),
+				listRegistrationsFunc: attendeeRegistrationsFunc,
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("subject 1234567890 may not make this transaction change - the attempt has been logged"),
+			},
+		},
+		{
+			name: "user access should deny when trying to update to non-pending",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionStatus: entities.TransactionStatusValid,
+					TransactionType:   entities.TransactionTypePayment,
+				},
+				seed: []entities.Transaction{
+					{
+						Model: gorm.Model{
+							CreatedAt: time.Now().AddDate(0, 0, -3).Add(-time.Second * 10),
+						},
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionStatus: entities.TransactionStatusTentative,
+						TransactionType:   entities.TransactionTypePayment,
+					},
+				},
+				ctx:                   attendeeCtx(),
+				listRegistrationsFunc: attendeeRegistrationsFunc,
+			},
+			expected: expected{
+				err: apierrors.NewForbidden("subject 1234567890 may not make this transaction change - the attempt has been logged"),
+			},
+		},
+		{
+			name: "user should successfully update a transaction",
+			args: args{
+				transaction: &entities.Transaction{
+					DebitorID:         1,
+					TransactionID:     "12345",
+					TransactionType:   entities.TransactionTypePayment,
+					TransactionStatus: entities.TransactionStatusPending,
+				},
+				seed: []entities.Transaction{
+					{
+						DebitorID:         1,
+						TransactionID:     "12345",
+						TransactionType:   entities.TransactionTypePayment,
+						TransactionStatus: entities.TransactionStatusTentative,
+					},
+				},
+				ctx: apiKeyCtx(),
+			},
+			expected: expected{
+				err:    nil,
+				status: entities.TransactionStatusPending,
+			},
+		},
+		// --- admin test cases ---
 		{
 			name: "should return not found if original transaction could not be found in the database",
 			args: args{
@@ -1265,6 +1372,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 		listRegistrationsFunc func(ctx context.Context) ([]int64, error)
 		createPaylinkFunc     func(ctx context.Context, request cncrdadapter.PaymentLinkRequestDto) (cncrdadapter.PaymentLinkDto, error)
 		debitorID             int64
+		method                entities.PaymentMethod
 		ctx                   context.Context
 		seed                  []entities.Transaction
 	}
@@ -1407,7 +1515,7 @@ func TestCreateTransactionForOutstandingDues(t *testing.T) {
 				tt.args.ctx = context.TODO()
 			}
 
-			res, err := i.CreateTransactionForOutstandingDues(tt.args.ctx, tt.args.debitorID)
+			res, err := i.CreateTransactionForOutstandingDues(tt.args.ctx, tt.args.debitorID, tt.args.method)
 
 			if tt.expected.err != nil {
 				require.EqualError(t, err, tt.expected.err.Error())

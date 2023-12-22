@@ -92,5 +92,6 @@ type Transaction struct {
 }
 
 type TransactionInitiator struct {
-	DebitorID int64 `json:"debitor_id"`
+	DebitorID int64                  `json:"debitor_id"`
+	Method    entities.PaymentMethod `json:"method"`
 }

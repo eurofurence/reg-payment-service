@@ -31,25 +31,45 @@ var errHelpRequested = errors.New("help text was requested")
 var (
 	showHelp       bool
 	migrate        bool
+	ecsJsonLogging bool
 	configFilePath string
+)
+
+const (
+	envDbPassword = "REG_SECRET_DB_PASSWORD"
+	envApiToken   = "REG_SECRET_API_TOKEN"
 )
 
 func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	logging.SetupLogging("payment-service", false)
+	err := parseArgs()
+
+	logging.SetupLogging("payment-service", ecsJsonLogging)
 	logger := logging.NewLogger()
 
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	logger.Debug("loading configuration")
-	conf, err := parseArgsAndReadConfig(logger)
 	if err != nil {
 		if !errors.Is(err, errHelpRequested) {
 			logger.Fatal("%v", err)
 		}
 		os.Exit(0)
+	}
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+
+	logger.Debug("loading configuration")
+	conf, err := readConfigFile(logger)
+	if err != nil {
+		logger.Fatal("%v", err)
+	}
+
+	logger.Debug("applying environment variable config overrides")
+	envConfigOverrides(conf)
+
+	err = config.Validate(conf, logger.Warn)
+	if err != nil {
+		logger.Fatal("%v", err)
 	}
 
 	repo := constructOrFail(ctx, logger, func() (database.Repository, error) {
@@ -111,26 +131,28 @@ func main() {
 	}
 }
 
-func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) {
-
-	// TODO parse flags into variable that is available to the main function.
-	// Extract the flags logic into different function.
+func parseArgs() error {
 	flag.BoolVar(&showHelp, "h", false, "Displays the help text")
 	flag.StringVar(&configFilePath, "config", "", "The path to a configuration file")
-	flag.BoolVar(&migrate, "migrate", false, "Performs database migrations before the service starts")
+	flag.BoolVar(&migrate, "migrate-database", false, "Performs database migrations before the service starts")
+	flag.BoolVar(&ecsJsonLogging, "ecs-json-logging", false, "Enable json logging")
 
 	flag.Parse()
 
 	if showHelp {
 		flag.PrintDefaults()
-		return nil, errHelpRequested
+		return errHelpRequested
 	}
 
 	if configFilePath == "" {
 		flag.PrintDefaults()
-		return nil, errors.New("no config file was provided")
+		return errors.New("no config file was provided")
 	}
 
+	return nil
+}
+
+func readConfigFile(logger logging.Logger) (*config.Application, error) {
 	fi, err := os.Stat(configFilePath)
 	if err != nil {
 		return nil, err
@@ -150,12 +172,18 @@ func parseArgsAndReadConfig(logger logging.Logger) (*config.Application, error) 
 		return nil, err
 	}
 
-	if err := config.Validate(conf, logger.Warn); err != nil {
-		return nil, err
-	}
-
 	return conf, nil
 }
+
+func envConfigOverrides(conf *config.Application) {
+	if dbPassword := os.Getenv(envDbPassword); dbPassword != "" {
+		conf.Database.Password = dbPassword
+	}
+	if apiToken := os.Getenv(envApiToken); apiToken != "" {
+		conf.Security.Fixed.Api = apiToken
+	}
+}
+
 func constructOrFail[T any](ctx context.Context, logger logging.Logger, constructor func() (T, error)) T {
 	const failMsg = "Construction failed. [error]: %v"
 	if constructor == nil {

@@ -378,7 +378,7 @@ func TestCheckRequestAuthorization(t *testing.T) {
 				},
 			}
 
-			r, err := http.NewRequestWithContext(context.TODO(), "GET", "/", nil)
+			r, err := http.NewRequestWithContext(context.TODO(), "GET", "/not/health", nil)
 			require.NoError(t, err)
 
 			if tt.args.xAPIKeyHeader != "" {
