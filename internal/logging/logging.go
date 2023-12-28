@@ -64,6 +64,7 @@ func SetupLogging(applicationName string, useEcsLogging bool) {
 	aulogging.RequestIdRetriever = GetRequestID
 	if useEcsLogging {
 		auzerolog.SetupJsonLogging(applicationName)
+		zerolog.TimeFieldFormat = "2006-01-02T15:04:05.000Z"
 	} else {
 		aulogging.DefaultRequestIdValue = defaultReqId
 		auzerolog.SetupPlaintextLogging()
