@@ -23,7 +23,7 @@ type TransactionLog struct {
 	DebitorID         int64             `gorm:"index;type:bigint;NOT NULL"`
 	TransactionID     string            `gorm:"index;type:varchar(80) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;NOT NULL"`
 	TransactionType   TransactionType   `gorm:"type:enum('due', 'payment')"`
-	PaymentMethod     PaymentMethod     `gorm:"type:enum('credit', 'paypal', 'transfer', 'internal', 'gift')"`
+	PaymentMethod     PaymentMethod     `gorm:"type:enum('credit', 'paypal', 'transfer', 'internal', 'gift', 'cash')"`
 	PaymentStartUrl   string            `gorm:"type:text CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;default:NULL"`
 	TransactionStatus TransactionStatus `gorm:"type:enum('tentative', 'pending', 'valid', 'deleted')"`
 	Amount            Amount            `gorm:"embedded"`
