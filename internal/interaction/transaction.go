@@ -442,8 +442,8 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 		return apierrors.NewForbidden("transaction is not eligible for requesting a payment link")
 	}
 
-	// Check if there are any pending transactions.
-	pending, err := s.arePendingPaymentsPresent(ctx, newTransaction.DebitorID)
+	// Check if there are any pending or tentative transactions that block creation of the payment
+	pending, err := s.arePendingPaymentsPresent(ctx, newTransaction.DebitorID, newTransaction.PaymentMethod)
 
 	if err != nil {
 		logger.Error("could not retrieve pending payments for debitor %d - [error]: %v", newTransaction.DebitorID, err)
@@ -544,24 +544,28 @@ func randomDigits(count int) string {
 	return string(res)
 }
 
-func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debitorID int64) (bool, error) {
+func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debitorID int64, requestedPaymentMethod entities.PaymentMethod) (bool, error) {
 	transactions, err := s.store.GetTransactionsByFilter(ctx, entities.TransactionQuery{DebitorID: debitorID})
 	if err != nil {
 		return false, err
 	}
 
 	// check if there are any existing transactions of type payment, and return if they are
-	// in pending or tentative state
+	// in pending state
 	for _, tt := range transactions {
 		switch tt.TransactionStatus {
-		case entities.TransactionStatusPending, entities.TransactionStatusTentative:
+		case entities.TransactionStatusPending:
 			if tt.TransactionType == entities.TransactionTypePayment {
+				return true, nil
+			}
+		case entities.TransactionStatusTentative:
+			if tt.TransactionType == entities.TransactionTypePayment && tt.PaymentMethod == requestedPaymentMethod {
 				return true, nil
 			}
 		}
 	}
 
-	// no pending payment transactions
+	// no pending payment transactions, and no tentative transactions of the same type
 	return false, nil
 }
 
