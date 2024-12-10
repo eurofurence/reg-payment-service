@@ -434,6 +434,9 @@ components:
           format: date-time
           description: the time at which the transaction was created. Read only, ignored when receiving a transaction, because this is just the database timestamp.
           example: '2022-06-24T11:12:13Z'
+        reason:
+          type: string
+          description: allows storing extra information as to why this transaction was created. Not processed in any way, but returned when querying transactions.
     TransactionInitiator:
       type: object
       required:

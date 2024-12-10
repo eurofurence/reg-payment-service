@@ -31,6 +31,7 @@ type TransactionLog struct {
 	Deletion          Deletion          `gorm:"embedded;embeddedPrefix:deleted_"`
 	EffectiveDate     sql.NullTime      `gorm:"type:date;NOT NULL"`
 	DueDate           sql.NullTime      `gorm:"type:date;NULL;default:NULL"`
+	Reason            string            `gorm:"type:longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;default:NULL"`
 }
 
 // // TableName implements the Tabler interface to change from a pluarlized table name to
