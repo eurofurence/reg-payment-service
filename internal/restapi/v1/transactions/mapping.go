@@ -23,6 +23,7 @@ func ToV1Transaction(tran entities.Transaction) Transaction {
 		Info:            make(map[string]interface{}), // TODO (no field)
 		PaymentStartUrl: tran.PaymentStartUrl,
 		EffectiveDate:   tran.EffectiveDate.Time.Format("2006-01-02"),
+		Reason:          tran.Reason,
 	}
 
 	if !tran.CreatedAt.IsZero() {
@@ -60,6 +61,7 @@ func ToTransactionEntity(tr Transaction) (*entities.Transaction, error) {
 			Valid: true,
 			Time:  effDate,
 		},
+		Reason: tr.Reason,
 	}
 
 	if tr.DueDate != "" {

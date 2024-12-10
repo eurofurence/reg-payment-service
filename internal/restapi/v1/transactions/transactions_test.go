@@ -124,6 +124,7 @@ func newTransaction(debID int64, tranID string,
 			Time:  effDate,
 			Valid: true,
 		},
+		Reason: `{"for":"` + tranID + `"}`,
 	}
 }
 

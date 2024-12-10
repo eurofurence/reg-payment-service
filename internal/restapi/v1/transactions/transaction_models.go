@@ -89,6 +89,7 @@ type Transaction struct {
 	DueDate               string                      `json:"due_date,omitempty"`
 	CreationDate          *time.Time                  `json:"creation_date,omitempty"`
 	StatusHistory         []StatusHistory             `json:"status_history"`
+	Reason                string                      `json:"reason"`
 }
 
 type TransactionInitiator struct {
