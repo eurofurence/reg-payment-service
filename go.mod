@@ -15,7 +15,7 @@ require (
 	gorm.io/gorm v1.26.1
 )
 
-require github.com/rs/zerolog v1.33.0
+require github.com/rs/zerolog v1.34.0
 
 require (
 	github.com/go-sql-driver/mysql v1.7.0 // indirect
