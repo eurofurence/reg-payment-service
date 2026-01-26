@@ -442,7 +442,7 @@ func (s *serviceInteractor) validateAttendeeTransaction(ctx context.Context, new
 		return apierrors.NewForbidden("transaction is not eligible for requesting a payment link")
 	}
 
-	// Check if there are any pending or tentative transactions that block creation of the payment
+	// Check if there are any pending transactions that block creation of the payment
 	pending, err := s.arePendingPaymentsPresent(ctx, newTransaction.DebitorID, newTransaction.PaymentMethod)
 
 	if err != nil {
@@ -558,14 +558,10 @@ func (s *serviceInteractor) arePendingPaymentsPresent(ctx context.Context, debit
 			if tt.TransactionType == entities.TransactionTypePayment {
 				return true, nil
 			}
-		case entities.TransactionStatusTentative:
-			if tt.TransactionType == entities.TransactionTypePayment && tt.PaymentMethod == requestedPaymentMethod {
-				return true, nil
-			}
 		}
 	}
 
-	// no pending payment transactions, and no tentative transactions of the same type
+	// no pending payment transactions
 	return false, nil
 }
 
