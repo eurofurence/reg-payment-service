@@ -5,6 +5,6 @@ build/**
 main
 reg-payment-service
 **/*.swp
-config.yaml
+config*.yaml
 Notes.md
 cover.out
